@@ -46,11 +46,16 @@ export function toneOf(reading: string): number {
   return 0;
 }
 
-/** 去掉声调符号与 ü 的两点，得到 slug 可用的字母串 */
+/**
+ * 去掉声调符号，并把 ü 转成 v，得到 slug 可用的字母串。
+ *
+ * ⚠ `ü` 在 NFD 下分解为 `u` + 组合分音符（U+0308）。**两者要一起换成 `v`**——
+ * 只换分音符会得到 `uv` 而不是 `v`（实测踩过：`lǚ` → `luv`，韵母算成 `uv` 而落空）。
+ */
 export function plainOf(reading: string): string {
   return reading
     .normalize("NFD")
-    .replace(/\u0308/g, "v")
+    .replace(/u\u0308/g, "v")
     .replace(/[\u0300-\u036f]/g, "")
     .replace(/[^a-z]/gi, "")
     .toLowerCase();
