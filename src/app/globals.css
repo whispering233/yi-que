@@ -27,4 +27,50 @@
    */
   --font-sans: system-ui, -apple-system, "PingFang SC", "HarmonyOS Sans SC", "MiSans", "Microsoft YaHei", sans-serif;
   --font-serif: "Songti SC", "Noto Serif CJK SC", "Source Han Serif SC", "STSong", "SimSun", serif;
+
+  /*
+   * 格律标注五态。**这是领域语义色，不是 antd 的 token**——antd 没有「平声」
+   * 这样的概念。所以它在 `tokens.ts` 的 PALETTE 里定义，此处只是 CSS 镜像。
+   *
+   * 界面骨架的颜色不走这里：那些一律用 antd 的 `--ant-*` 变量（见下方别名层）。
+   */
+  --color-ping: #2c5f7c;
+  --color-ping-soft: #e8f0f5;
+  --color-ze: #8a5a2b;
+  --color-ze-soft: #f6efe6;
+  --color-any-tone: #8a857d;
+  --color-undetermined: #8a7a3d;
+  --color-undetermined-soft: #f7f4e6;
+  --color-violation: #b3261e;
+  --color-violation-soft: #fbeae8;
+}
+
+/*
+ * 页面根元素的底色与正文色。
+ *
+ * **走 antd 的 CSS 变量**——它们是 antd 从 seed token 派生的，此处不写死值。
+ * 不设的话 body 是透明底，页面会用浏览器默认白，与宣纸白的取向不符。
+ */
+body {
+  background-color: var(--ant-color-bg-layout);
+  color: var(--ant-color-text);
+}
+
+/*
+ * 界面骨架色的**别名层**：值与名字全部来自 antd 的 CSS 变量，此处不定义值。
+ *
+ * 为什么需要它：内容页用原生元素写，才能保持服务端组件、并且不必为每个页面内联
+ * 一份 antd 的样式。`@theme inline` 让 Tailwind 生成 `text-ink` 这类工具类，
+ * 取值直接是 `var(--ant-color-text)`。
+ *
+ * **这不是第二套样式系统**——没有一个是写死的值。
+ */
+@theme inline {
+  --color-ink: var(--ant-color-text);
+  --color-ink-secondary: var(--ant-color-text-secondary);
+  --color-ink-tertiary: var(--ant-color-text-tertiary);
+  --color-canvas: var(--ant-color-bg-container);
+  --color-surface: var(--ant-color-fill-quaternary);
+  --color-hairline: var(--ant-color-border-secondary);
+  --color-accent: var(--ant-color-primary);
 }

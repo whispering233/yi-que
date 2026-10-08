@@ -98,5 +98,8 @@ export const antdTheme: ThemeConfig = {
     borderRadius: 6,
     fontFamily: FONT_SANS,
     fontSize: 14,
+    // 触屏优先：可点击元素命中区不小于 44×44px。
+    // antd 默认 32px——用 seed token 提到 44，全站控件一起生效（不逐处覆盖）
+    controlHeight: 44,
   },
 };

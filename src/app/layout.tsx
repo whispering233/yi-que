@@ -10,7 +10,12 @@ export const metadata: Metadata = {
   description: "宋词的创作、鉴赏与交流平台",
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+/**
+ * 不用 Next.js 的 `LayoutProps<"/">`——那是**构建期生成**的全局类型，
+ * 而 `pnpm typecheck` 跑在 `next build` 之前，干净检出时它还不存在。
+ * 显式声明更稳，且不依赖构建顺序。
+ */
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="zh-CN" className="h-full antialiased">
       <body className="flex min-h-full flex-col">

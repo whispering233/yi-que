@@ -14,7 +14,7 @@ export type ToneRequirement = "平" | "仄" | "中";
  * 只含结构信息。词谱数据中的**和声**标注（如「竹枝」「女儿」）不是结构标记，
  * 单独放在 `Slot.harmony`。
  */
-export type RhythmMark = "句" | "读" | "韵" | "叶" | "叠" | "换";
+export type RhythmMark = "句" | "读" | "韵" | "叶" | "叠" | "换" | "重";
 
 /** 词格中的一个字位。 */
 export interface Slot {
@@ -81,4 +81,4 @@ export interface Tune {
 export const TONE_REQUIREMENTS = ["平", "仄", "中"] as const;
 
 /** 全部句读标记，供遍历与校验使用 */
-export const RHYTHM_MARKS = ["句", "读", "韵", "叶", "叠", "换"] as const;
+export const RHYTHM_MARKS = ["句", "读", "韵", "叶", "叠", "换", "重"] as const;

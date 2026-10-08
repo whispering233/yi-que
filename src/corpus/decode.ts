@@ -93,8 +93,9 @@ export function decodeTune(stored: StoredTune): Tune {
   };
 }
 
-/** 词牌索引 → 名字到 slug 的映射。检索与页面生成共用 */
+/** 词牌索引 → 索引列表 + 名字到 slug 的映射。检索与页面生成共用 */
 export function decodeTuneIndex(index: StoredTuneIndex): {
+  tunes: StoredTuneIndex["tunes"];
   byName: Map<string, { slug: string; name: string; charCounts: readonly number[] }>;
 } {
   const byName = new Map<string, { slug: string; name: string; charCounts: readonly number[] }>();
@@ -103,7 +104,7 @@ export function decodeTuneIndex(index: StoredTuneIndex): {
     byName.set(tune.name, entry);
     for (const alias of tune.aliases) if (!byName.has(alias)) byName.set(alias, entry);
   }
-  return { byName };
+  return { tunes: index.tunes, byName };
 }
 
 /**
