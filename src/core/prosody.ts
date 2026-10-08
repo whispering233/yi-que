@@ -19,7 +19,6 @@ import {
   type RhymeBook,
   type Slot,
   type SlotResult,
-  type Tone,
   type ToneRequirement,
   type Verdict,
 } from "../schema/index.ts";
