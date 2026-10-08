@@ -11,6 +11,8 @@
 
 ### Added
 
+- **领域类型（`src/schema/`）**：领域类型的**唯一来源**。十一个实体（词牌 / 词格 / 字位 / 词作 / 词人 / 韵书 / 韵部 / 字音 / 校验结果 / 字位结果 / 候选词格）的两层形态——存储形态（紧凑编码，带 brand）与领域形态。
+- **`schema` 包的两道机械护栏**：断言判定态恒为三值且与字位内容不重叠；断言包内**只能有相对导入**（不得依赖 React / antd / Next / Node API）。故意让 schema 引用 antd，护栏会失败（已验证）。
 - **设计令牌单一来源**：`src/ui/tokens.ts` 定义断点、字体栈、调色板与 antd 主题；`globals.css` 的 `@theme` 是 CSS 侧镜像（Tailwind 无法读 TS），一致性由护栏测试断言。antd 主题从该文件直接消费。
 - **断点护栏测试**：断言 `globals.css` 与 `tokens.ts` 的断点、字体栈一致。用 Node 内置测试运行器（`node --test`，Node 22 原生跑 `.ts`），**不引测试框架**。
 - **`useBreakpoint`**：基于 `matchMedia` 的断点 hook，消费同一份 `BREAKPOINTS` 常量。
@@ -26,6 +28,8 @@
 
 ### Note
 
+- **判定与输入状态正交由类型强制**：`SlotResult` 是判别联合，判定态只可能出现在「已填」的字位上、可选字音只可能出现在「待定」上。因此「缺字被渲染成待定」这类语义污染在编译期即被拦住。
+- **和声与句读标记分开建模**：句读标记是封闭集合（引擎的变格逻辑按它分支），和声是任意文本。混在一起会让句读标记无法封闭，失去类型安全。
 - **Tailwind 工具类只能写在原生元素上。** Tailwind v4 的工具类在 `@layer utilities` 里，而 antd 的 CSS-in-JS 样式未分层——按 CSS 规范未分层样式优先，与特异性无关。实测 `<Tag className="sm:hidden">` 的类名在 DOM 上但 `display` 仍为 antd 的 `inline-block`。
 - **禁用 antd 的响应式 API**（`Row`/`Col` 的断点 props、`Grid.useBreakpoint`）。其断点硬编码为 576/768/992/1200 且**无法通过 `theme.token` 覆盖**（实测；对照组传 `colorPrimary` 生效），与本项目的 640/768/1024/1280 不一致。响应式一律走 Tailwind，JS 侧用 `useBreakpoint`。
 - **antd 的复合组件（`Typography.Title` 这类属性访问）在 React 服务端组件里取不到**——服务端组件从客户端模块导入得到的是客户端引用代理。**使用 antd 复合组件的页面必须标 `"use client"`。**
