@@ -84,18 +84,28 @@ GitHub Pages 的项目页形式是 `https://<user>.github.io/<repo>/`，**有路
 
 > **对 URL 契约的影响**：`30-web-app.md` 冻结的是**路径结构**（`/tune/{slug}`、`/ci/{id}`），不是站点根前缀。根前缀属部署配置，迁移时整体变化，不破坏站内结构。但**外部链接会失效**——这在前缀期间是有代价的，所以尽早接自定义域名。
 
-#### 二、Brotli 不确定，载荷须按 gzip 计
+#### 二、实测：GitHub Pages 只提供 gzip，不支持 Brotli
 
-GitHub Pages **不支持自定义响应头**，无法自己控制压缩算法。是否提供 Brotli 须**实测**（部署后 `curl -H 'Accept-Encoding: br' -I <url>` 看响应头）。
+同一 URL，三种 `Accept-Encoding` 的实测结果：
 
-若只有 gzip，载荷预算须按 gzip 重算：
+| 请求 | 响应 |
+| :--- | :--- |
+| `gzip` | `content-encoding: gzip`，18704 字节 |
+| `br` | **无 `content-encoding`**，108929 字节——**未压缩，比 gzip 更差** |
+| `identity` | 无 `content-encoding`，108929 字节 |
 
-| 产物 | Brotli（理想） | gzip（GitHub Pages 下限） | 差距 |
+浏览器实际发送 `gzip, deflate, br, zstd`，GitHub Pages 回 gzip。**HTML / CSS / JS 三类资源均如此。**
+
+**载荷预算因此按 gzip 计：**
+
+| 产物 | gzip（当前托管） | Brotli（若有） | 差距 |
 | :--- | :--- | :--- | :--- |
-| 词谱（首屏） | 386KB | 581KB | +51% |
-| 语料（搜索页） | 2.08MB | 2.77MB | +33% |
+| 词谱（首屏必需） | 581KB | 386KB | +51% |
+| 词库语料（搜索页） | 2.77MB | 2.08MB | +33% |
 
-**这不改变架构**（仍是纯静态、客户端检索），只影响加载时长。若实测只有 gzip 且移动端体验不可接受，再评估换托管。
+**这不改变架构**（仍是纯静态、客户端检索），只影响加载时长。若移动端实测不可接受，可选路径见 `backlog.md`。
+
+**其他实测**：目录式 URL 正常（`/yi-que` → 301 → `/yi-que/`）；不存在的路径返回 404；`cache-control: max-age=600`（内容指纹文件名使长缓存无意义）。
 
 #### 三、中国大陆访问不稳定
 

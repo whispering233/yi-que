@@ -40,7 +40,7 @@
 - [x] `AntdRegistry` 包裹 RootLayout
 - [x] 路径前缀由构建配置从 `NEXT_PUBLIC_BASE_PATH` 消费
 - [x] 一个验证页：antd 组件 + Tailwind 布局 + 三档断点表现
-- [ ] 推送后 GitHub Pages 部署跑通（`deploy.yml` 生效）　**阻塞：仓库尚无远程**
+- [x] 推送后 GitHub Pages 部署跑通（`deploy.yml` 生效）
 
 **验证**：构建产物中 antd 样式完整（非无样式裸 DOM）；`curl -H 'Accept-Encoding: br' -I <url>` 确认压缩算法
 **文档**：`architecture.md`、`build.md`
