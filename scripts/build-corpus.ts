@@ -16,6 +16,7 @@ import { ensureUpstream } from "./lib/fetch.ts";
 import { Guards, GuardFailure, checkGzipBudget } from "./lib/guard.ts";
 import { countPieces, parseSketch, tokenizeMarks } from "./lib/sketch.ts";
 import { SOURCES } from "./lib/sources.ts";
+import { buildCorpus } from "./lib/corpus.ts";
 import { buildTunes, tonesOf } from "./lib/tune.ts";
 import { NON_TUNE_NAMES, buildNameIndex, normalizeTuneName } from "./lib/tune-name.ts";
 
@@ -183,6 +184,23 @@ function guardTuneNameCoverage(guards: Guards): void {
   console.log(`  · 未命中词牌名 ${missed.size} 种，TOP: ${top.map(([n, c]) => `${n}(${c})`).join(" ")}`);
 }
 
+/** slug 冲突必须在构建期暴露，**不得静默回退**——否则两个词人共用一个 URL */
+function guardSlugUniqueness(guards: Guards, slugs: readonly string[], label: string): void {
+  const seen = new Map<string, number>();
+  const empty: string[] = [];
+  for (const slug of slugs) {
+    if (!slug) empty.push(slug);
+    seen.set(slug, (seen.get(slug) ?? 0) + 1);
+  }
+  const dup = [...seen.entries()].filter(([, n]) => n > 1);
+  guards.check(
+    `${label} slug 无冲突`,
+    dup.length === 0,
+    dup.length ? `${dup.length} 组冲突（如 ${dup.slice(0, 3).map(([s, n]) => `${s}×${n}`).join("、")}）` : `${slugs.length} 个 slug 唯一`,
+  );
+  guards.check(`${label} slug 无空值`, empty.length === 0, `${empty.length} 个空 slug`);
+}
+
 async function main(): Promise<void> {
   const guards = new Guards();
 
@@ -196,6 +214,7 @@ async function main(): Promise<void> {
   // ② 转换
   //    卡 6 词牌名归一化 · 卡 7 语料 · 卡 8 韵书 · 卡 9 字体子集 · 卡 10 slug
   const tune = buildTunes(UPSTREAM);
+  const corpus = buildCorpus(UPSTREAM);
 
   // ③ 写产物
   mkdirSync(OUT, { recursive: true });
@@ -203,9 +222,13 @@ async function main(): Promise<void> {
   writeFileSync(join(OUT, "meta.json"), JSON.stringify(provenance()));
   writeFileSync(join(OUT, "tunes-index.json"), JSON.stringify(tune.index));
   writeFileSync(join(OUT, "tunes.json"), JSON.stringify({ tunes: tune.tunes }));
+  writeFileSync(join(OUT, "corpus.json"), JSON.stringify(corpus.corpus));
 
   // 待核清单：不静默丢弃，也不阻断构建，写进清单供人工过目
-  writeFileSync(join(REPORTS, "tune-anomalies.json"), JSON.stringify(tune.anomalies, null, 2));
+  writeFileSync(
+    join(REPORTS, "tune-anomalies.json"),
+    JSON.stringify([...tune.anomalies, ...corpus.anomalies], null, 2),
+  );
 
   // ④ 护栏
   const counts = corpusCounts();
@@ -225,6 +248,16 @@ async function main(): Promise<void> {
     tunes.passRate >= 0.96,
     `实测 ${(tunes.passRate * 100).toFixed(1)}%，基线 96%`,
   );
+
+  guards.between("语料：清洗后乱码残留", corpus.stats.residual, 0, 0, " 处");
+  guards.between("语料：被替换的乱码数", corpus.stats.garbled, 0, 200, " 处");
+  guards.check(
+    "语料：清洗不改变字位数",
+    corpus.stats.rawChars === corpus.stats.cleanChars,
+    `清洗前 ${corpus.stats.rawChars} 字，清洗后 ${corpus.stats.cleanChars} 字`,
+  );
+  guards.between("语料：缺字标记数", corpus.stats.missing, 2900, 3200, " 处");
+  guardSlugUniqueness(guards, corpus.corpus.authors.map((a) => a.slug), "词人");
 
   guardTuneIds(guards, tune);
   guardTuneNameCoverage(guards);
