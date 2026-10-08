@@ -33,9 +33,22 @@ export interface DecodedSlot extends Slot {
 /**
  * 一个字的平仄判定。
  *
- * 三态里的「合」对「中」是**平凡成立**的——该位平仄皆可，任何读音都满足要求。
- * 所以「中」判「合」而不是别的：界面靠字位上的 `tone: "中"` 区分「无要求」，
- * 不需要额外造一个态（那会破坏三态约束）。
+ * ## 多音字：**存在合律读法即「合」**
+ *
+ * 只要该字存在一个满足要求的读音，就判「合」——这不是猜，是「该字存在合律读法」
+ * 这个**确定的事实**：作者完全可以选那个读音。词学上多音字只要一读合律就算合。
+ *
+ * 「出律」只在**所有**读音都不满足时才给，因此**不会任取一个读音后判为出律**。
+ *
+ * ## 三态各自的触发条件
+ *
+ * | 态 | 触发 |
+ * | :--- | :--- |
+ * | 合 | 该位要求「中」（平凡满足），或该字存在合律读音 |
+ * | 出律 | 该字读音全部与要求冲突 |
+ * | **待定** | **韵书里查不到该字**——引擎无从判定，这是「数据里没有」而非「猜不出」 |
+ *
+ * 界面靠字位上的 `tone` 区分「无要求」，不为「中」另造一个态（那会破坏三态约束）。
  */
 function judgeTone(
   required: ToneRequirement,
@@ -44,25 +57,69 @@ function judgeTone(
   // 「中」表示平仄皆可——平凡满足
   if (required === "中") return { verdict: "合", readings };
 
-  if (readings.length === 0) {
-    // 韵书里查不到这个字——既不判合也不判出律，按「待定」处理并如实说明
-    return { verdict: "待定", readings };
-  }
+  if (readings.length === 0) return { verdict: "待定", readings };
 
-  // 多读但平仄一致（如两个读音都是平声）等价于一读——按集合大小判，不按读音个数
-  const tones = new Set<Tone>(readings.map((r) => r.tone));
-
-  if (tones.size === 1) {
-    return { verdict: match(required, [...tones][0]), readings };
-  }
-
-  // 平仄两读交错：**L1 不猜**。语境消歧是 L2 的事，此处诚实降级为「待定」——
-  // 不得任取一个读音后判为出律，那是在制造错误信息
-  return { verdict: "待定", readings };
+  return {
+    verdict: readings.some((r) => r.tone === required) ? "合" : "出律",
+    readings,
+  };
 }
 
-const match = (required: ToneRequirement, actual: Tone): Verdict =>
-  required === actual ? "合" : "出律";
+/** 韵类标记——这些位置上的字必须同韵部 */
+const RHYME_MARKS = new Set(["韵", "叶", "叠", "换"]);
+
+/**
+ * L2：**韵脚约束**。
+ *
+ * 一片内的所有韵脚**必然同属一个韵部**——这是词体本身的硬约束，不是启发式。
+ *
+ * 它在新语义下的作用不是判平仄（那由「存在合律读法」规则解决），而是
+ * **确定韵脚字属于哪个韵部**：多音字在韵脚位有多个候选韵部，靠其余韵脚
+ * 约束到唯一的一个，界面才能回答「我这一片押对了吗」。
+ *
+ * 算法：逐个韵脚取「候选韵部集合」求交。交集唯一时该片韵部即确定，用它过滤
+ * 每个字的候选读音。**求不出唯一交集就不动**，绝不任取一个。
+ */
+function narrowByRhyme(
+  slots: readonly DecodedSlot[],
+  chars: readonly string[],
+  readingsByChar: ReadonlyMap<string, readonly Reading[]>,
+): Map<number, readonly Reading[]> {
+  const narrowed = new Map<number, readonly Reading[]>();
+
+  for (const piece of splitPieces(slots)) {
+    const rhymeSlots = piece.filter((i) => RHYME_MARKS.has(slots[i].rhythm));
+    // 单韵脚无从约束：交集只有一个集合，等于没约束
+    if (rhymeSlots.length < 2) continue;
+
+    const candidateSets = rhymeSlots
+      .map((i) => {
+        const char = chars[i];
+        if (char === undefined) return null;
+        const readings = narrowed.get(i) ?? readingsByChar.get(char) ?? [];
+        // 无读音的字（韵书查不到）不参与约束
+        if (readings.length === 0) return null;
+        return { index: i, groups: new Set(readings.map((r) => r.group)), readings };
+      })
+      .filter((x): x is { index: number; groups: Set<string>; readings: readonly Reading[] } => x !== null);
+
+    if (candidateSets.length < 2) continue;
+
+    const common = new Set(candidateSets[0].groups);
+    for (const set of candidateSets.slice(1)) {
+      for (const group of common) if (!set.groups.has(group)) common.delete(group);
+    }
+    // 交集为空（该片实际不押韵）或仍有多个可能（约束不足）——都不动，保持待定
+    if (common.size !== 1) continue;
+
+    for (const set of candidateSets) {
+      const filtered = set.readings.filter((r) => common.has(r.group));
+      if (filtered.length > 0 && filtered.length < set.readings.length) narrowed.set(set.index, filtered);
+    }
+  }
+
+  return narrowed;
+}
 
 /** 按词格的换片标记切出各片的字位区间 */
 export function splitPieces(slots: readonly DecodedSlot[]): number[][] {
@@ -123,6 +180,9 @@ export function check(
   const chars = toChars(text);
   const slots: DecodedSlot[] = form.slots.map((slot, index) => ({ ...slot, index }));
 
+  // L2 消歧先跑一轮：韵脚约束窄化候选读音集合，再逐字判定
+  const narrowed = narrowByRhyme(slots, chars, book.readingsByChar);
+
   const results: SlotResult[] = slots.map((slot, index) => {
     const base = { index, tone: slot.tone, rhythm: slot.rhythm, shift: slot.shift };
 
@@ -135,7 +195,7 @@ export function check(
       return { ...base, content: { kind: "缺字" } };
     }
 
-    const readings = book.readingsByChar.get(char) ?? [];
+    const readings = narrowed.get(index) ?? book.readingsByChar.get(char) ?? [];
     const judged = judgeTone(slot.tone, readings);
     const content = { kind: "已填", char } as const;
 

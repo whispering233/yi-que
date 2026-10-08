@@ -68,23 +68,33 @@ test("「中」是平凡满足——不该记作待定", () => {
   assert.equal(r.summary.undeterminedCount, 0);
 });
 
-test("多音字平仄两读：L1 诚实降级为「待定」，不猜", () => {
+test("多音字：**存在合律读法即「合」**——这不是猜，是确定的事实", () => {
+  // 「看」有平（kān）与仄（kàn）两读，两个字位各有一个读法满足要求
   const form2: Form = { ...form, slots: [s("平", "韵"), s("仄", "句")] };
   const r = check(form2, "看看", 多读);
-  const first = r.slots[0];
-  assert.ok(isFilled(first), "「看」有字，是已填");
-  assert.equal(first.verdict, "待定");
-  assert.equal(r.summary.undeterminedCount, 2);
-  assert.equal(r.summary.conclusion, "合律", "待定不影响整体结论，它是保留信息");
-  assert.equal(r.summary.violationCount, 0, "**待定不得计入出律**");
+  assert.ok(isFilled(r.slots[0]), "「看」有字，是已填");
+  assert.equal(r.slots[0].verdict, "合");
+  assert.equal(r.summary.violationCount, 0);
+  assert.equal(r.summary.undeterminedCount, 0, "多音字不再是待定的理由");
 });
 
-test("待定态携带可选读音——这是「待定」唯一有用的地方", () => {
+test("多音字：所有读音都不满足才「出律」——**不得任取一个读音判出律**", () => {
+  // 「看」只有平（kān）与仄（kàn）；要求平又要求仄时各自可满足，
+  // 但一个只有仄读的字放在要求平的位置上，所有读法都不满足 → 出律
+  const 只仄 = book([["董", [reading("董", "仄", "第一部")]]]);
   const form2: Form = { ...form, slots: [s("平", "句")] };
-  const slot = check(form2, "看", 多读).slots[0];
+  const r = check(form2, "董", 只仄);
+  assert.equal(r.summary.violationCount, 1);
+});
+
+test("待定：**韵书查不到该字**时才给——它是「数据里没有」而非「猜不出」", () => {
+  // 「飐」实测在词林正韵里查不到
+  const form2: Form = { ...form, slots: [s("仄", "句")] };
+  const slot = check(form2, "飐", 一读).slots[0];
   assert.ok(isFilled(slot), "应已填");
   assert.equal(slot.verdict, "待定");
-  assert.equal(slot.readings.length, 2, "必须给出全部可选读音，否则用户无法据此改字");
+  assert.equal(slot.readings.length, 0, "无读音可给");
+  assert.equal(check(form2, "飐", 一读).summary.violationCount, 0, "查不到不得计入出律");
 });
 
 test("缺字不产出判定态——既不合也不出律也不待定", () => {
