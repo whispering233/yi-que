@@ -82,6 +82,11 @@ export const isFilled = (r: SlotResult): r is FilledSlotResult =>
 /** 候选词格及其匹配度。 */
 export interface FormCandidate {
   readonly formId: string;
+  readonly tuneSlug: string;
+  readonly tuneName: string;
+  /** 正体与否——决胜规则的第二顺位 */
+  readonly isPrimary: boolean;
+  readonly charCount: number;
   /** 出律字数——匹配度的主判据 */
   readonly violationCount: number;
   /** 待定字数。不参与排序，但影响用户对结果的信任度 */

@@ -86,8 +86,9 @@ function narrowByRhyme(
 ): Map<number, readonly Reading[]> {
   const narrowed = new Map<number, readonly Reading[]>();
 
-  for (const piece of splitPieces(slots)) {
-    const rhymeSlots = piece.filter((i) => RHYME_MARKS.has(slots[i].rhythm));
+  // 韵段而非片——菩萨蛮这类换韵格一片内有多个韵段
+  for (const segment of splitRhymeSegments(slots)) {
+    const rhymeSlots = segment.filter((i) => RHYME_MARKS.has(slots[i].rhythm));
     // 单韵脚无从约束：交集只有一个集合，等于没约束
     if (rhymeSlots.length < 2) continue;
 
@@ -120,6 +121,47 @@ function narrowByRhyme(
   return narrowed;
 }
 
+/**
+ * 按**韵段**切分。
+ *
+ * 判平仄与分片用的是**片**（换片标记），而韵部约束用的是**韵段**——两者不同：
+ * 菩萨蛮每片内换韵两次，一个片里有四个韵段。
+ *
+ * **韵段边界不由「换」标记单独决定**。实测：
+ *
+ * - 菩萨蛮有 4 个韵段却只有 2 个「换」标记
+ * - 清平乐上下片换韵，却一个「换」都没有
+ *
+ * 所以边界还要看**平仄要求类型的变化**：一个「韵」标记处的要求若与上一个韵脚的
+ * 要求类型（平 / 仄）不同，就是新的韵段。
+ *
+ * **「叶」是通叶**（仄声字通押平声韵部），它不切段——西江月正是这种。
+ */
+export function splitRhymeSegments(slots: readonly DecodedSlot[]): number[][] {
+  const segments: number[][] = [];
+  let current: number[] = [];
+  /** 上一个韵脚位的平仄类型。叶不参与，所以它不改变这个值 */
+  let lastToneClass: "平" | "仄" | null = null;
+
+  for (const slot of slots) {
+    const isRhyme = slot.rhythm === "韵" || slot.rhythm === "换";
+    const startsNew = slot.rhythm === "换" || (isRhyme && lastToneClass !== null && slot.tone !== "中" && slot.tone !== lastToneClass);
+
+    if (startsNew && current.length > 0) {
+      segments.push(current);
+      current = [];
+      lastToneClass = null;
+    }
+    current.push(slot.index);
+
+    if (isRhyme && slot.tone !== "中") lastToneClass = slot.tone;
+    // 「中」不改变类型记录——它不表达平仄倾向
+  }
+
+  if (current.length > 0) segments.push(current);
+  return segments;
+}
+
 /** 按词格的换片标记切出各片的字位区间 */
 export function splitPieces(slots: readonly DecodedSlot[]): number[][] {
   const pieces: number[][] = [];
@@ -139,7 +181,7 @@ export function splitPieces(slots: readonly DecodedSlot[]): number[][] {
 const rhymePositions = (slots: readonly DecodedSlot[], indices: readonly number[]): number[] =>
   indices.filter((i) => slots[i].rhythm === "韵");
 
-/** 按片统计韵部使用情况 */
+/** 按片统计韵部使用情况。**片内再按韵段细分**，换韵点由词格的「换」标记决定 */
 function summarizeRhymes(
   slots: readonly DecodedSlot[],
   pieces: readonly number[][],
