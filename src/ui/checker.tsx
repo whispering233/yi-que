@@ -66,15 +66,14 @@ export function Checker() {
 
   const tune = data && tuneSlug ? (data.bySlug.get(tuneSlug) ?? null) : null;
 
-  // 选中词牌后默认用正体；换词牌时若原词格不属于新词牌，也回落到正体
-  useEffect(() => {
-    if (!tune) return;
-    if (!tune.forms.some((f) => f.id === formId)) {
-      setFormId((tune.forms.find((f) => f.isPrimary) ?? tune.forms[0]).id);
-    }
-  }, [tune, formId]);
-
-  const form = tune?.forms.find((f) => f.id === formId) ?? null;
+  // 选中词牌后默认用正体；换词牌时若原词格不属于新词牌，也回落到正体。
+  // **派生而非用 effect 同步状态**——effect 里 setState 会引发级联渲染，
+  // 而这里本来就只是一个「没选就用正体」的默认值。
+  const form =
+    tune?.forms.find((f) => f.id === formId) ??
+    tune?.forms.find((f) => f.isPrimary) ??
+    tune?.forms[0] ??
+    null;
 
   // 逐字实时校验：引擎是纯函数，文本一变就重算
   const result = useMemo(() => {
@@ -151,8 +150,10 @@ export function Checker() {
                 <button
                   type="button"
                   onClick={() => setFormId(f.id)}
-                  aria-pressed={f.id === formId}
-                  className={`min-h-11 rounded-sm border px-3 text-sm ${f.id === formId ? "border-accent text-accent" : "border-hairline hover:border-accent"}`}
+                  {/* 比对**派生出的** form 而不是 state：否则默认选中的正体
+                      虽然高亮，无障碍接口却报 false */}
+                  aria-pressed={form?.id === f.id}
+                  className={`min-h-11 rounded-sm border px-3 text-sm ${form?.id === f.id ? "border-accent text-accent" : "border-hairline hover:border-accent"}`}
                 >
                   {f.isPrimary ? "正体" : `又一体 ${i}`}
                   <span className="ml-1 text-xs text-ink-tertiary">{f.charCount} 字</span>
