@@ -17,6 +17,7 @@ import { Guards, GuardFailure, checkGzipBudget } from "./lib/guard.ts";
 import { countPieces, parseSketch, tokenizeMarks } from "./lib/sketch.ts";
 import { SOURCES } from "./lib/sources.ts";
 import { buildTunes, tonesOf } from "./lib/tune.ts";
+import { NON_TUNE_NAMES, buildNameIndex, normalizeTuneName } from "./lib/tune-name.ts";
 
 const ROOT = process.cwd();
 const UPSTREAM = join(ROOT, "data", "upstream");
@@ -144,6 +145,44 @@ function guardTuneIds(guards: Guards, tune: ReturnType<typeof buildTunes>): void
   writeFileSync(path, JSON.stringify(current, null, 2));
 }
 
+/**
+ * 词牌名命中率——引擎能接手真实语料的前提。
+ *
+ * 命中率跌破基线说明词谱换了词牌名格式，或映射表失效。**不得静默回退**：
+ * 未命中的词牌名会让那些词作无法校验，用户看到的是「无匹配词格」。
+ */
+function guardTuneNameCoverage(guards: Guards): void {
+  const indexRaw = JSON.parse(
+    readFileSync(join(UPSTREAM, "couyun", "couyun", "ci_pu", "ci_index.json"), "utf8"),
+  ) as { names: string[]; names_trad?: string[] }[];
+  const index = buildNameIndex(indexRaw);
+
+  const records = JSON.parse(readFileSync(join(UPSTREAM, "quansongci", "ci.json"), "utf8")) as {
+    RECORDS: { rhythmic: string }[];
+  };
+
+  let valid = 0;
+  let hit = 0;
+  const missed = new Map<string, number>();
+  for (const rec of records.RECORDS) {
+    const name = (rec.rhythmic || "").trim();
+    if (NON_TUNE_NAMES.includes(name)) continue;
+    valid++;
+    if (normalizeTuneName(name, index)) hit++;
+    else missed.set(name, (missed.get(name) ?? 0) + 1);
+  }
+
+  const rate = hit / valid;
+  guards.check(
+    "词牌名命中率",
+    rate >= 0.975,
+    `实测 ${(rate * 100).toFixed(1)}%（${hit}/${valid}），基线 97.5%`,
+  );
+
+  const top = [...missed.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8);
+  console.log(`  · 未命中词牌名 ${missed.size} 种，TOP: ${top.map(([n, c]) => `${n}(${c})`).join(" ")}`);
+}
+
 async function main(): Promise<void> {
   const guards = new Guards();
 
@@ -188,6 +227,7 @@ async function main(): Promise<void> {
   );
 
   guardTuneIds(guards, tune);
+  guardTuneNameCoverage(guards);
   checkGzipBudget(guards, OUT);
 
   const results = guards.settle();
