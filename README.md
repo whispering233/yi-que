@@ -49,6 +49,7 @@
 | `docs/design/10-prosody-engine.md` | 格律引擎的领域模型、能力分层、判定语义 |
 | `docs/design/20-corpus-pipeline.md` | 数据管道、清洗规则、紧凑编码、体积预算、字体子集 |
 | `docs/design/30-web-app.md` | 路由与 URL 契约、检索、响应式、交互约束、SEO |
+| `docs/design/40-data-model.md` | 领域数据结构：实体、字段、结果结构 |
 | `docs/design/build.md` | 开发环境、构建、部署、发布流程 |
 | `docs/design/config.md` | 配置说明 |
 | `docs/design/backlog.md` | 开发遗留项与已明确不做的方向 |
