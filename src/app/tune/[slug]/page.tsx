@@ -42,7 +42,7 @@ export default async function TunePage({ params }: { params: Promise<{ slug: str
         <nav className="flex items-center gap-1 text-xs text-ink-tertiary">
           <Link
             href="/tune"
-            className="-mx-2 inline-flex min-h-11 items-center px-2 hover:text-accent"
+            className="-mx-2 inline-flex min-h-11 min-w-11 items-center justify-center px-2 hover:text-accent"
           >
             词谱索引
           </Link>

@@ -12,10 +12,11 @@
  * **这是有意的取舍**，不是清理误删：加回客户端导航就要接受体积。
  */
 
-import { readdirSync, rmSync, statSync } from "node:fs";
+import { readFileSync, readdirSync, rmSync, statSync } from "node:fs";
 import { join } from "node:path";
 
 const OUT = join(process.cwd(), "out");
+const SOURCE_URL = "https://github.com/whispering233/yi-que";
 
 let removed = 0;
 let bytes = 0;
@@ -41,3 +42,25 @@ function walk(dir: string): void {
 
 walk(OUT);
 console.log(`  清理 RSC 载荷：${removed} 个文件，${(bytes / 1048576).toFixed(0)}MB`);
+
+/**
+ * **AGPL-3.0 合规自检**：页脚须常驻源码入口。
+ *
+ * 抽检若干页面而不是全量（23439 个页面全扫太慢），但覆盖首页、内容页、
+ * 交互页三类——它们走的是同一个根布局。
+ */
+const SAMPLES = ["index.html", "ci/1/index.html", "tune/zhuzhi/index.html", "check/index.html", "search/index.html", "about/index.html"];
+const missing = SAMPLES.filter((rel) => {
+  try {
+    return !readFileSync(join(OUT, rel), "utf8").includes(SOURCE_URL);
+  } catch {
+    return true;
+  }
+});
+if (missing.length > 0) {
+  console.error(`\n✗ AGPL 合规自检未通过：${missing.length} 个页面缺少源码入口`);
+  for (const m of missing) console.error(`  ✗ ${m}`);
+  console.error("\n页脚必须常驻源码入口——这是许可证义务，不是可选装饰。\n");
+  process.exit(1);
+}
+console.log(`  ✓ AGPL 合规：${SAMPLES.length} 个抽检页面均有源码入口`);

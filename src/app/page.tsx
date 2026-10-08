@@ -146,11 +146,11 @@ export default function Home() {
         </Flex>
       </Card>
 
-      <footer className="text-center">
+      <div className="text-center">
         <Text type="secondary" className="text-xs">
           设计文档与数据来源见仓库 docs/ 目录
         </Text>
-      </footer>
+      </div>
     </main>
     </AntdProvider>
   );

@@ -65,7 +65,7 @@ export default async function CiPage({ params }: { params: Promise<{ id: string 
 
       <nav className="flex items-center gap-1 text-xs text-ink-tertiary">
         {tune && (
-          <Link href={`/tune/${tune.slug}`} className="-mx-2 inline-flex min-h-11 items-center px-2 hover:text-accent">
+          <Link href={`/tune/${tune.slug}`} className="-mx-2 inline-flex min-h-11 min-w-11 items-center justify-center px-2 hover:text-accent">
             {tune.name}
           </Link>
         )}
@@ -75,7 +75,7 @@ export default async function CiPage({ params }: { params: Promise<{ id: string 
         <h1 className="font-serif text-2xl text-ink">{tune?.name ?? "无词牌"}</h1>
         <p className="text-sm text-ink-secondary">
           {author ? (
-            <Link href={`/author/${author.slug}`} className="hover:text-accent">
+            <Link href={`/author/${author.slug}`} className="-mx-2 -my-3 inline-flex min-h-11 items-center px-2 py-3 hover:text-accent">
               {author.name}
             </Link>
           ) : (
@@ -88,16 +88,16 @@ export default async function CiPage({ params }: { params: Promise<{ id: string 
 
       <CiText text={ci.text} />
 
-      <footer className="flex flex-wrap gap-x-4 gap-y-1 border-t border-hairline pt-4 text-xs text-ink-tertiary">
+      <div className="flex flex-wrap gap-x-4 gap-y-1 border-t border-hairline pt-4 text-xs text-ink-tertiary">
         {tune && (
-          <Link href={`/tune/${tune.slug}`} className="inline-flex min-h-11 items-center hover:text-accent">
+          <Link href={`/tune/${tune.slug}`} className="-mx-2 inline-flex min-h-11 min-w-11 items-center justify-center px-2 hover:text-accent">
             看这首词的词谱
           </Link>
         )}
-        <Link href="/check" className="inline-flex min-h-11 items-center hover:text-accent">
+        <Link href="/check" className="-mx-2 inline-flex min-h-11 min-w-11 items-center justify-center px-2 hover:text-accent">
           用格律校验它
         </Link>
-      </footer>
+      </div>
     </main>
   );
 }
