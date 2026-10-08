@@ -1,0 +1,91 @@
+# 部署到 GitHub Pages
+#
+# 触发：push 到 main。
+#
+# ⚠ 本工作流在应用脚手架存在之前会**自动跳过构建**（见 check-scaffold 步骤），
+#   以免每次 push 都是红叉。package.json 出现后自动开始真正部署。
+#
+# ⚠ GitHub Pages 项目页（https://<user>.github.io/<repo>/）有路径前缀，
+#   因此构建时必须设 NEXT_PUBLIC_BASE_PATH=/<repo>，由 next.config 消费。
+#   换用自定义域名后该前缀须置空——届时改这里的一行。
+#   详见 docs/design/build.md 的「部署」节。
+
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      # 应用脚手架尚未建立时跳过后续步骤，保持 CI 绿
+      - name: Check for app scaffold
+        id: scaffold
+        run: |
+          if [ -f package.json ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::package.json 不存在，跳过构建与部署（应用脚手架尚未建立）"
+          fi
+
+      - name: Setup pnpm
+        if: steps.scaffold.outputs.ready == 'true'
+        uses: pnpm/action-setup@v6
+        with:
+          version: 12
+
+      - name: Setup Node.js
+        if: steps.scaffold.outputs.ready == 'true'
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        if: steps.scaffold.outputs.ready == 'true'
+        run: pnpm install --frozen-lockfile
+
+      # 数据管道在应用构建之前运行，且护栏不通过即失败（见 docs/design/20-corpus-pipeline.md）
+      - name: Build
+        if: steps.scaffold.outputs.ready == 'true'
+        env:
+          # 项目页路径前缀。换自定义域名时改为空字符串
+          NEXT_PUBLIC_BASE_PATH: /${{ github.event.repository.name }}
+        run: pnpm build
+
+      # Next.js 的静态导出产物在 out/。Jekyll 会跳过下划线开头的目录（_next/），
+      # 因此必须放 .nojekyll
+      - name: Add .nojekyll
+        if: steps.scaffold.outputs.ready == 'true'
+        run: touch out/.nojekyll
+
+      - name: Setup Pages
+        if: steps.scaffold.outputs.ready == 'true'
+        uses: actions/configure-pages@v6
+
+      - name: Upload artifact
+        if: steps.scaffold.outputs.ready == 'true'
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: out
+
+      - name: Deploy to GitHub Pages
+        if: steps.scaffold.outputs.ready == 'true'
+        id: deployment
+        uses: actions/deploy-pages@v5
