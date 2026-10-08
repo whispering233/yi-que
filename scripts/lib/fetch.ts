@@ -8,10 +8,27 @@
  * 因此下载带重试与超时。校验失败**不重试**——那不是网络问题，重试只是浪费时间。
  */
 
+import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, renameSync, statSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  renameSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import { join } from "node:path";
-import { SOURCES, fileUrls, type UpstreamFile, type UpstreamSource } from "./sources.ts";
+import {
+  SOURCES,
+  fileUrls,
+  tarballUrl,
+  type FileSource,
+  type TarballSource,
+  type UpstreamFile,
+  type UpstreamSource,
+} from "./sources.ts";
 
 export interface FetchReport {
   readonly fetched: readonly string[];
@@ -59,22 +76,19 @@ export async function withRetry<T>(fn: () => Promise<T>, opts: RetryOptions): Pr
   );
 }
 
-const sha256 = (path: string): string =>
-  createHash("sha256").update(readFileSync(path)).digest("hex");
-
-const isIntact = (path: string, file: UpstreamFile): boolean =>
-  existsSync(path) && statSync(path).size === file.bytes && sha256(path) === file.sha256;
+const sha256Of = (buf: Buffer): string => createHash("sha256").update(buf).digest("hex");
 
 /**
- * 下载并校验。
+ * 依次尝试全部镜像下载，并校验大小与哈希。
  *
- * 每次尝试依次走全部镜像，第一个成功即返回——镜像顺序见 `sources.ts`。
- * **校验失败不重试**：那说明登记表过期，重试无用。
+ * 校验失败**不重试**：那说明登记表过期，重试无用。
  */
-async function download(source: UpstreamSource, file: UpstreamFile): Promise<Buffer> {
-  const urls = fileUrls(source, file);
-  const name = `${source.id}/${file.as}`;
-
+async function fetchVerified(
+  urls: readonly string[],
+  bytes: number,
+  sha256: string,
+  name: string,
+): Promise<Buffer> {
   const buf = await withRetry(
     async () => {
       let lastError: unknown;
@@ -86,8 +100,8 @@ async function download(source: UpstreamSource, file: UpstreamFile): Promise<Buf
           const res = await fetch(url, { signal: AbortSignal.timeout(90_000) });
           if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);
           const body = Buffer.from(await res.arrayBuffer());
-          if (body.length !== file.bytes) {
-            throw new Error(`内容不完整（${body.length}/${file.bytes} 字节）`);
+          if (body.length !== bytes) {
+            throw new Error(`内容不完整（${body.length}/${bytes} 字节）`);
           }
           return body;
         } catch (err) {
@@ -110,14 +124,74 @@ async function download(source: UpstreamSource, file: UpstreamFile): Promise<Buf
     },
   );
 
-  const actual = createHash("sha256").update(buf).digest("hex");
-  if (actual !== file.sha256) {
+  const actual = sha256Of(buf);
+  if (actual !== sha256) {
     throw new Error(
-      `上游文件哈希不符：${name}\n  实测 ${actual}\n  登记 ${file.sha256}\n` +
+      `上游文件哈希不符：${name}\n  实测 ${actual}\n  登记 ${sha256}\n` +
         `  上游可能已更新——升级须有意为之（改 sources.ts 的 commit 与指纹）`,
     );
   }
   return buf;
+}
+
+const isIntact = (path: string, bytes: number, sha256: string): boolean =>
+  existsSync(path) &&
+  statSync(path).size === bytes &&
+  sha256Of(readFileSync(path)) === sha256;
+
+/** 原子写：先写临时文件再改名，中断不会留下半截文件被下次误判为「完好」 */
+function writeAtomic(target: string, buf: Buffer): void {
+  const tmp = `${target}.tmp`;
+  writeFileSync(tmp, buf);
+  renameSync(tmp, target);
+}
+
+async function ensureFiles(root: string, source: FileSource): Promise<FetchReport> {
+  const fetched: string[] = [];
+  const reused: string[] = [];
+  let bytes = 0;
+  const dir = join(root, source.id);
+  mkdirSync(dir, { recursive: true });
+
+  for (const file of source.files) {
+    const target = join(dir, file.as);
+    const name = `${source.id}/${file.as}`;
+
+    if (isIntact(target, file.bytes, file.sha256)) {
+      reused.push(name);
+      continue;
+    }
+    const buf = await fetchVerified(fileUrls(source, file), file.bytes, file.sha256, name);
+    writeAtomic(target, buf);
+    fetched.push(name);
+    bytes += buf.length;
+  }
+
+  return { fetched, reused, bytes };
+}
+
+async function ensureTarball(root: string, source: TarballSource): Promise<FetchReport> {
+  const dir = join(root, source.id);
+  const marker = join(dir, ".extracted");
+  const name = `${source.id}@${source.commit.slice(0, 8)}`;
+
+  // 已按同一提交解包过 → 跳过
+  if (existsSync(marker) && readFileSync(marker, "utf8").trim() === source.commit) {
+    return { fetched: [], reused: [name], bytes: 0 };
+  }
+
+  mkdirSync(dir, { recursive: true });
+  const buf = await fetchVerified([tarballUrl(source)], source.bytes, source.sha256, name);
+
+  const archive = join(dir, "repo.tar.gz");
+  writeAtomic(archive, buf);
+
+  // 剥掉顶层的 `repo-<sha>/` 目录，使解包结果与提交无关（路径稳定）
+  execFileSync("tar", ["xzf", archive, "--strip-components=1", "-C", dir], { stdio: "inherit" });
+  rmSync(archive);
+  writeFileSync(marker, source.commit);
+
+  return { fetched: [name], reused: [], bytes: buf.length };
 }
 
 export async function ensureUpstream(
@@ -129,29 +203,13 @@ export async function ensureUpstream(
   let bytes = 0;
 
   for (const source of sources) {
-    const dir = join(root, source.id);
-    mkdirSync(dir, { recursive: true });
-
-    for (const file of source.files) {
-      const target = join(dir, file.as);
-      const name = `${source.id}/${file.as}`;
-
-      if (isIntact(target, file)) {
-        reused.push(name);
-        continue;
-      }
-
-      const buf = await download(source, file);
-
-      // 先写临时文件再改名——中断不会留下半截文件被下次误判为「已存在且完好」
-      const tmp = `${target}.tmp`;
-      writeFileSync(tmp, buf);
-      renameSync(tmp, target);
-
-      fetched.push(name);
-      bytes += buf.length;
-    }
+    const r = source.kind === "files" ? await ensureFiles(root, source) : await ensureTarball(root, source);
+    fetched.push(...r.fetched);
+    reused.push(...r.reused);
+    bytes += r.bytes;
   }
 
   return { fetched, reused, bytes };
 }
+
+export type { UpstreamFile };

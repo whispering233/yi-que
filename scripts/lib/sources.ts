@@ -22,7 +22,7 @@ export interface UpstreamFile {
   readonly sha256: string;
 }
 
-export interface UpstreamSource {
+interface UpstreamBase {
   /** 登记名，也是落盘目录名 */
   readonly id: string;
   readonly purpose: string;
@@ -31,8 +31,29 @@ export interface UpstreamSource {
   readonly homepage: string;
   readonly repo: string;
   readonly commit: string;
+}
+
+/** 逐文件登记的源。适合文件数少的仓库 */
+export interface FileSource extends UpstreamBase {
+  readonly kind: "files";
   readonly files: readonly UpstreamFile[];
 }
+
+/**
+ * 整仓 tarball 形式的源。适合文件数多的仓库。
+ *
+ * 逐文件登记上千个文件不现实；tarball 是**单文件、单哈希**，且锁定提交后
+ * 内容不可变。解包时剥掉顶层的 `repo-<sha>/` 目录。
+ */
+export interface TarballSource extends UpstreamBase {
+  readonly kind: "tarball";
+  readonly bytes: number;
+  readonly sha256: string;
+  /** 解包后保留的根路径（相对剥离顶层目录后的位置） */
+  readonly keep: string;
+}
+
+export type UpstreamSource = FileSource | TarballSource;
 
 const RAW = "https://raw.githubusercontent.com";
 
@@ -52,8 +73,13 @@ export const MIRRORS: readonly string[] = [
   "https://cdn.jsdelivr.net/gh/{repo}@{commit}/{path}",
 ];
 
+/** tarball 的镜像（只有 GitHub 自家提供仓库归档） */
+export function tarballUrl(source: TarballSource): string {
+  return `https://codeload.github.com/${source.repo}/tar.gz/${source.commit}`;
+}
+
 /** 按锁定提交拼出全部候选 URL，按顺序尝试 */
-export function fileUrls(source: UpstreamSource, file: UpstreamFile): readonly string[] {
+export function fileUrls(source: FileSource, file: UpstreamFile): readonly string[] {
   return MIRRORS.map((m) =>
     m
       .replace("{repo}", source.repo)
@@ -64,6 +90,7 @@ export function fileUrls(source: UpstreamSource, file: UpstreamFile): readonly s
 
 export const SOURCES: readonly UpstreamSource[] = [
   {
+    kind: "files",
     id: "quansongci",
     purpose: "词作文本与词人",
     license: "MIT",
@@ -86,6 +113,7 @@ export const SOURCES: readonly UpstreamSource[] = [
     ],
   },
   {
+    kind: "files",
     id: "pinyin-data",
     purpose: "普通话拼音（推导中华新韵，兼作多音字候选读音集合）",
     license: "MIT",
@@ -101,5 +129,20 @@ export const SOURCES: readonly UpstreamSource[] = [
       },
     ],
   },
-  // 词谱源在卡 5 登记。选型须先确认许可——上游语料的授权不被其自身许可覆盖。
+  {
+    // 词谱源。选用理由见 docs/research/competitive-analysis.md：
+    //   - MIT 许可明确，且数据来源是《钦定词谱》原典誊录（不是抓商业网站）
+    //   - ci_origin 与另一份独立誊录（LyricPatterns）逐字吻合，誊录忠实性有旁证
+    //   - 结构化程度高：紧凑平仄串、韵脚位次、句读标记、别名、拼音一应俱全
+    kind: "tarball",
+    id: "couyun",
+    purpose: "《钦定词谱》原典誊录与结构化数据",
+    license: "MIT",
+    homepage: "https://github.com/hulbji/couyun",
+    repo: "hulbji/couyun",
+    commit: "1744e87f850c2205bc231bfdd858256036c0e4db",
+    bytes: 30494459,
+    sha256: "eb442d85c7e78812e1cf43259364dc5b61ab02f2f1ffbd23e16661b0db435eb3",
+    keep: "couyun/ci_pu",
+  },
 ];
