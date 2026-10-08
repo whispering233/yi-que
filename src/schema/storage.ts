@@ -108,10 +108,15 @@ export interface StoredProvenance {
  */
 export interface StoredRhymeBook {
   readonly name: string;
+  /**
+   * **按 (韵部, 声调) 分别成组**——同一个韵部会因声调不同而出现多次
+   * （词林正韵的第一部有平声与仄声两组）。加载时合并双方的 `字 → 字音`，
+   * 韵部名单去重。
+   */
   readonly groups: readonly {
     readonly name: string;
     readonly tone: Tone;
-    /** 该韵部下的字，一字一读法 */
+    /** 该韵部该声调下的字，一字一读法 */
     readonly chars: EncodedChars;
     /**
      * 与 `chars` 一一对应的读法标签，可选。

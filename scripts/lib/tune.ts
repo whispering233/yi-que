@@ -260,7 +260,7 @@ export function buildTunes(upstreamDir: string): TuneArtifacts {
         charCount,
         sketch: f.sketch,
         exampleAuthor: f.author,
-        slots: f.slots,
+        slots: f.slots as StoredForm["slots"],
       } satisfies StoredForm;
     });
 

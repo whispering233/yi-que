@@ -106,7 +106,11 @@ export interface CorpusArtifacts {
   };
 }
 
-export function buildCorpus(upstreamDir: string): CorpusArtifacts {
+export function buildCorpus(
+  upstreamDir: string,
+  /** 词牌正名 → slug。语料的词牌只有名字，引用必须落成 slug */
+  tuneSlugs: ReadonlyMap<string, string>,
+): CorpusArtifacts {
   const table = loadPinyinTable(join(upstreamDir, "pinyin-data", "pinyin.txt"));
 
   const tuneIndex = buildNameIndex(
@@ -163,8 +167,18 @@ export function buildCorpus(upstreamDir: string): CorpusArtifacts {
     cleanChars += [...text].length;
     residual += countAnomalies(text);
 
-    const tuneSlug = normalizeTuneName(r.rhythmic ?? "", tuneIndex);
-    if (!tuneSlug && (r.rhythmic ?? "").trim() !== "失调名") {
+    const canon = normalizeTuneName(r.rhythmic ?? "", tuneIndex);
+    // 归一化给出的是**正名**；引用要落成 slug
+    const tuneSlug = canon ? (tuneSlugs.get(canon) ?? "") : "";
+    if (canon && !tuneSlug) {
+      anomalies.push({
+        kind: "词牌无 slug",
+        tune: canon,
+        form: 0,
+        detail: `归一化命中但没有对应 slug｜${r.author}｜第 ${i + 1} 首`,
+      });
+    }
+    if (!canon && (r.rhythmic ?? "").trim() !== "失调名") {
       unmatchedTune++;
       anomalies.push({
         kind: "词牌未匹配",
@@ -176,7 +190,7 @@ export function buildCorpus(upstreamDir: string): CorpusArtifacts {
 
     return {
       id: Number(r.value) || i + 1,
-      tuneSlug: tuneSlug ?? "",
+      tuneSlug,
       authorSlug: authorSlug(r.author ?? "", slugifyName(r.author ?? "", table)),
       // 题名留空——**语料没有题名**（全宋词体例中词牌即题）
       text,

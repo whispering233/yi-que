@@ -40,9 +40,22 @@ interface SlotResultBase {
   readonly shift?: boolean;
 }
 
-type FilledBase = SlotResultBase & {
-  readonly content: { readonly kind: "已填"; readonly char: string };
-};
+/**
+ * 「已填」的字位结果。
+ *
+ * 提成具名联合是为了能用类型守卫收窄——交叉类型里的嵌套判别字段 TS 收不窄，
+ * 调用方每次都得手动断言。
+ */
+export type FilledSlotResult =
+  | (SlotResultBase & {
+      readonly content: { readonly kind: "已填"; readonly char: string };
+      readonly verdict: "合" | "出律";
+    })
+  | (SlotResultBase & {
+      readonly content: { readonly kind: "已填"; readonly char: string };
+      readonly verdict: "待定";
+      readonly readings: readonly Reading[];
+    });
 
 /**
  * 字位结果。
@@ -56,8 +69,15 @@ type FilledBase = SlotResultBase & {
 export type SlotResult =
   | (SlotResultBase & { readonly content: { readonly kind: "未填" } })
   | (SlotResultBase & { readonly content: { readonly kind: "缺字" } })
-  | (FilledBase & { readonly verdict: "合" | "出律" })
-  | (FilledBase & { readonly verdict: "待定"; readonly readings: readonly Reading[] });
+  | FilledSlotResult;
+
+/**
+ * 该字位是否已填——**它是「可判定」的前提**，不是判定态的一部分。
+ *
+ * 手写类型守卫（而非 `Extract`）是因为嵌套判别字段的 Extract 在交叉类型下不可靠。
+ */
+export const isFilled = (r: SlotResult): r is FilledSlotResult =>
+  r.content.kind === "已填";
 
 /** 候选词格及其匹配度。 */
 export interface FormCandidate {

@@ -142,16 +142,10 @@ export function deriveXinyun(table: PinyinTable): {
     }
   }
 
+  // 韵部名去重后排序——声调不属于韵部
   const groups: RhymeGroup[] = [...groupSet]
     .sort((a, b) => XINYUN_ORDER.indexOf(a) - XINYUN_ORDER.indexOf(b))
-    .map((name) => {
-      const tone: Tone = [...readings.values()]
-        .flat()
-        .some((r) => r.group === name && r.tone === "平")
-        ? "平"
-        : "仄";
-      return { name, tone };
-    });
+    .map((name) => ({ name }));
 
   return { groups, readings, total: table.readings.size, covered, uncovered };
 }
@@ -195,7 +189,7 @@ export function readCilin(path: string): {
         }
         readings.set(char, list);
       }
-      groups.push({ name: group, tone });
+      if (!groups.some((g) => g.name === group)) groups.push({ name: group });
     }
   }
 
@@ -215,27 +209,28 @@ export function toStoredBook(
   readings: ReadonlyMap<string, Reading[]>,
   order: readonly string[],
 ): { book: StoredRhymeBook; charCount: number } {
-  const byGroup = new Map<string, { chars: string[]; labels: string[]; tone: Tone }>();
+  // 键是 (韵部, 声调)——韵部跨声调，不能只按韵部分组
+  const bySection = new Map<string, { group: string; tone: Tone; chars: string[]; labels: string[] }>();
 
   for (const [char, list] of readings) {
     for (const r of list) {
-      let g = byGroup.get(r.group);
+      const key = `${r.group}\u0000${r.tone}`;
+      let g = bySection.get(key);
       if (!g) {
-        g = { chars: [], labels: [], tone: r.tone };
-        byGroup.set(r.group, g);
+        g = { group: r.group, tone: r.tone, chars: [], labels: [] };
+        bySection.set(key, g);
       }
       g.chars.push(char);
       g.labels.push(r.label ?? "");
     }
   }
 
-  const groups = [...byGroup.keys()]
-    .sort((a, b) => order.indexOf(a) - order.indexOf(b))
-    .map((groupName) => {
-      const g = byGroup.get(groupName)!;
+  const groups = [...bySection.values()]
+    .sort((a, b) => order.indexOf(a.group) - order.indexOf(b.group) || a.tone.localeCompare(b.tone))
+    .map((g) => {
       const hasLabels = g.labels.some((l) => l !== "");
       return {
-        name: groupName,
+        name: g.group,
         tone: g.tone,
         chars: g.chars.join("") as StoredRhymeBook["groups"][number]["chars"],
         ...(hasLabels ? { labels: g.labels } : {}),

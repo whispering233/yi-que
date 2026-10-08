@@ -238,7 +238,7 @@ async function main(): Promise<void> {
   // ② 转换
   //    卡 6 词牌名归一化 · 卡 7 语料 · 卡 8 韵书 · 卡 9 字体子集 · 卡 10 slug
   const tune = buildTunes(UPSTREAM);
-  const corpus = buildCorpus(UPSTREAM);
+  const corpus = buildCorpus(UPSTREAM, new Map(tune.tunes.map((t) => [t.name, t.slug])));
 
   // 先算韵书（它自己也需要「实际用到的字」，但此处先用一个保守集合）
   // ——韵书的覆盖率护栏在下面用完整集合复算。
