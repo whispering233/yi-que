@@ -130,6 +130,30 @@ export const SOURCES: readonly UpstreamSource[] = [
     ],
   },
   {
+    // 字体源：生成扩展区 fallback 子集用。
+    //
+    // 选 **SubsetOTF 的 SC 变体（11.1MB）而非完整 Noto Serif CJK（24.5MB）**：
+    // 实测完整版只多覆盖 1 个我们需要的扩展 B 字（𠺕），为它多下 13MB 不值得。
+    // 两份字体都缺的扩展 B 字（𧣴 𠴇 𮉨 𫍙 𥱧 𦟂 𩘟）由待核清单记录。
+    //
+    // 源字体 11MB 不入版本控制；产物是约 40KB 的子集。
+    kind: "files",
+    id: "noto-serif-sc",
+    purpose: "生僻字 fallback 子集的字体源",
+    license: "OFL-1.1",
+    homepage: "https://github.com/notofonts/noto-cjk",
+    repo: "notofonts/noto-cjk",
+    commit: "f8d157532fbfaeda587e826d4cd5b21a49186f7c",
+    files: [
+      {
+        path: "Serif/SubsetOTF/SC/NotoSerifSC-Regular.otf",
+        as: "NotoSerifSC-Regular.otf",
+        bytes: 11625800,
+        sha256: "e8f396decc1f0963a016a989c3d8852e863d1350996f573860a80767c83a1cd3",
+      },
+    ],
+  },
+  {
     // 韵书源。
     //
     // ⚠ 这个仓库**只有韵书部分可用**：其韵书数据源自维基文库《詞林正韻》（公有领域），

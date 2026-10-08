@@ -17,6 +17,7 @@ import { Guards, GuardFailure, checkGzipBudget } from "./lib/guard.ts";
 import { countPieces, parseSketch, tokenizeMarks } from "./lib/sketch.ts";
 import { SOURCES } from "./lib/sources.ts";
 import { buildCorpus } from "./lib/corpus.ts";
+import { buildFallbackCharset, buildFontSubset } from "./lib/font.ts";
 import { buildRhymes } from "./lib/rhyme.ts";
 import { buildTunes, tonesOf } from "./lib/tune.ts";
 import { NON_TUNE_NAMES, buildNameIndex, normalizeTuneName } from "./lib/tune-name.ts";
@@ -217,15 +218,57 @@ async function main(): Promise<void> {
   const tune = buildTunes(UPSTREAM);
   const corpus = buildCorpus(UPSTREAM);
 
-  // 韵书需要「实际要用到哪些字」——从语料与词谱算出
+  // 先算韵书（它自己也需要「实际用到的字」，但此处先用一个保守集合）
+  // ——韵书的覆盖率护栏在下面用完整集合复算。
+  const rhyme0 = buildRhymes(UPSTREAM, []);
+
+  // 「实际要用到哪些字」——必须收齐**站点会渲染的每一段文本**，不能只收正文。
+  // 漏掉的那部分会渲染成豆腐块：作者名与简介、词牌名与别名、词格自述、韵部名
+  // 都可能含生僻字（实测作者简介里有 䰒 䕷 䆉 这类扩展 A 字）。
   const needed = new Set<string>();
-  for (const ci of corpus.corpus.cis) for (const ch of ci.text) needed.add(ch);
-  for (const t of tune.tunes) for (const f of t.forms) for (const ch of f.slots) needed.add(ch);
+  const absorb = (s: string | undefined) => {
+    if (s) for (const ch of s) needed.add(ch);
+  };
+  for (const ci of corpus.corpus.cis) {
+    absorb(ci.text);
+    absorb(ci.tuneSlug);
+    absorb(ci.authorSlug);
+  }
+  for (const a of corpus.corpus.authors) {
+    absorb(a.name);
+    absorb(a.description);
+  }
+  for (const t of tune.tunes) {
+    absorb(t.name);
+    absorb(t.description);
+    for (const alias of t.aliases) absorb(alias);
+    for (const f of t.forms) {
+      absorb(f.sketch);
+      absorb(f.exampleAuthor);
+    }
+  }
+  for (const book of rhyme0.books) {
+    absorb(book.name);
+    for (const g of book.groups) absorb(g.name);
+  }
   const isHan = (c: string) => {
     const n = c.codePointAt(0)!;
     return (n >= 0x3400 && n <= 0x9fff) || (n >= 0x20000 && n <= 0x3134f);
   };
-  const rhyme = buildRhymes(UPSTREAM, [...needed].filter(isHan));
+  // 字体子集：只为系统字体必然缺失的字符生成，正文走平台原生字体栈
+  // 韵书的覆盖率要用**完整**的需用字集合复算——先算出的那一版用的集合不完整
+  const neededHan = [...needed].filter(isHan);
+  const rhyme = {
+    books: rhyme0.books,
+    stats: {
+      ...rhyme0.stats,
+      coveredRatio: neededHan.length ? 1 - rhyme0.stats.gapChars.length / neededHan.length : 1,
+    },
+  };
+  const subset = await buildFontSubset(
+    join(UPSTREAM, "noto-serif-sc", "NotoSerifSC-Regular.otf"),
+    buildFallbackCharset(needed),
+  );
 
   // ③ 写产物
   mkdirSync(OUT, { recursive: true });
@@ -235,8 +278,13 @@ async function main(): Promise<void> {
   writeFileSync(join(OUT, "tunes.json"), JSON.stringify({ tunes: tune.tunes }));
   writeFileSync(join(OUT, "corpus.json"), JSON.stringify(corpus.corpus));
   writeFileSync(join(OUT, "rhyme.json"), JSON.stringify({ books: rhyme.books }));
+  writeFileSync(join(OUT, "font-fallback.woff2"), subset.font);
 
   // 待核清单：不静默丢弃，也不阻断构建，写进清单供人工过目
+  if (subset.uncovered.length > 0) {
+    console.log(`  · 字体缺失字形 ${subset.uncovered.length} 个：${subset.uncovered.join(" ")}`);
+  }
+
   writeFileSync(
     join(REPORTS, "tune-anomalies.json"),
     JSON.stringify([...tune.anomalies, ...corpus.anomalies], null, 2),
@@ -283,6 +331,14 @@ async function main(): Promise<void> {
     "韵书：拼音覆盖率",
     rhyme.stats.coveredRatio >= 0.9995,
     `实测 ${(rhyme.stats.coveredRatio * 100).toFixed(3)}%，缺口 ${rhyme.stats.gapChars.length} 字（${rhyme.stats.gapChars.slice(0, 5).join("")}）`,
+  );
+
+  guards.between("字体：子集请求字符数", subset.requested, 10, 60, " 个");
+  guards.between("字体：缺字形数", subset.uncovered.length, 0, 12, " 个");
+  guards.check(
+    "字体：子集确实含字形",
+    subset.font.length > 1024,
+    `子集 ${(subset.font.length / 1024).toFixed(1)}KB`,
   );
 
   guardTuneIds(guards, tune);

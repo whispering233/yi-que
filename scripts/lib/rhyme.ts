@@ -13,7 +13,7 @@
  */
 
 import { readFileSync } from "node:fs";
-import { readFileSync as readFile } from "node:fs";
+
 import { join } from "node:path";
 import type { Reading, RhymeGroup, StoredRhymeBook, Tone } from "../../src/schema/index.ts";
 import { loadPinyinTable as loadPinyinTableImpl, plainOf, toneOf, type PinyinTable } from "./slug.ts";
