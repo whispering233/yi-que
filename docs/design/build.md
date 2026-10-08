@@ -13,6 +13,10 @@
 
 **pnpm 版本只保留一处来源**——写在 `package.json` 的 `packageManager` 字段，CI 从那里读。在工作流里再指定一次会让 `pnpm/action-setup` 直接报错退出。
 
+`package.json` 带 `"type": "module"`——管道脚本以 ESM 运行，不加会每次报 `MODULE_TYPELESS_PACKAGE_JSON` 警告。
+
+脚本以裸 Node 直接跑 `.ts`（Node 22 原生支持类型擦除），**不引打包器也不引测试框架**。
+
 Tailwind v4 在 Next.js 16 下以 **Turbopack loader** 形式接入，**不使用 PostCSS**，因此仓库中没有 PostCSS 配置。
 
 数据管道在开发环境的首次运行会拉取上游数据源，需要网络。
@@ -32,9 +36,10 @@ Tailwind v4 在 Next.js 16 下以 **Turbopack loader** 形式接入，**不使�
 ② 应用构建
    静态产物 + 应用代码
      → Next.js 静态导出
-     → Brotli 预压缩
      → 部署产物
 ```
+
+命令对应：`pnpm build` = `pnpm build:corpus && next build`。管道也可单独跑（`pnpm build:corpus`），便于在不动应用的情况下迭代数据。
 
 ### 关键性质
 

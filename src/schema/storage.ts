@@ -85,6 +85,22 @@ export interface StoredCorpus {
 }
 
 /**
+ * 产物：来源与版本清单。
+ *
+ * 站点须标注第三方数据来源与许可——这是 AGPL 义务，不是可选装饰。
+ */
+export interface StoredProvenance {
+  readonly sources: readonly {
+    readonly id: string;
+    readonly purpose: string;
+    readonly license: string;
+    readonly homepage: string;
+    /** 锁定的上游提交。保证构建可复现 */
+    readonly commit: string;
+  }[];
+}
+
+/**
  * 韵书的存储形态。
  *
  * **只存韵部方向**（韵书的原生形态，也是产物紧凑的前提）。
