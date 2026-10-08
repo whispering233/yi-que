@@ -36,13 +36,13 @@
 
 **目标**：站点能构建、能上线，且 antd 样式在静态导出下完整。**这是全项目风险最高的一步**——antd v6 用 CSS-in-JS，在 Next.js App Router 且启用静态导出时样式能否被构建期完整抽取**尚未验证**。若不通过，UI 基座须更换，此时返工成本最低。
 
-- [ ] Next.js（App Router，静态导出）+ TypeScript + Tailwind + antd v6
-- [ ] `AntdRegistry` 包裹 RootLayout
-- [ ] 路径前缀由构建配置从 `NEXT_PUBLIC_BASE_PATH` 消费
-- [ ] 一个验证页：antd 组件 + Tailwind 布局 + 三档断点表现
-- [ ] 推送后 GitHub Pages 部署跑通（`deploy.yml` 生效）
+- [x] Next.js（App Router，静态导出）+ TypeScript + Tailwind + antd v6
+- [x] `AntdRegistry` 包裹 RootLayout
+- [x] 路径前缀由构建配置从 `NEXT_PUBLIC_BASE_PATH` 消费
+- [x] 一个验证页：antd 组件 + Tailwind 布局 + 三档断点表现
+- [ ] 推送后 GitHub Pages 部署跑通（`deploy.yml` 生效）　**阻塞：仓库尚无远程**
 
-**验证**：部署后访问站点，antd 组件样式完整（非无样式裸 DOM）；`curl -H 'Accept-Encoding: br' -I <url>` 确认压缩算法
+**验证**：构建产物中 antd 样式完整（非无样式裸 DOM）；`curl -H 'Accept-Encoding: br' -I <url>` 确认压缩算法
 **文档**：`architecture.md`、`build.md`
 
 ### 卡 2 · 设计令牌与断点单一来源
@@ -251,6 +251,7 @@
 - [ ] 结构化数据、规范链接、站点地图（覆盖全部词作/词牌/词人）
 - [ ] 检索结果页不被索引
 - [ ] 缺字有专门呈现，**不得呈现为「待定」**
+- [ ] **控制 antd 组件用量**：抽取的样式内联进每个页面且不可跨页缓存，内容页应优先用基础组件或自绘（见 `backlog.md`）
 
 **验证**：抽查页面被正确预渲染（查看静态 HTML 含正文）；站点地图条数与数据量一致
 **文档**：`30-web-app.md`

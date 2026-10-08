@@ -9,8 +9,7 @@
 | 语言 | TypeScript | 格律引擎须在前端逐字实时运行；同语言使引擎、管道、UI 共用一套领域类型 |
 | 框架 | Next.js（App Router） | 词作详情页是 SEO 主力资产，需要构建期预渲染；静态导出即可发布，零服务端成本 |
 | UI 组件 | antd v6 | 中文原生设计语义（组件元数据双语、设计标度为中文排版校准）；官方 CLI 提供离线版本化元数据与 MCP 接口，AI 可查真实 props 而非凭记忆；`antd design.md` 直接产出 `@google/design.md` 规范的 token 源 |
-| 样式 | Tailwind CSS | 只管布局（flex/gap/grid/断点）；颜色与排版一律走 antd token，不并存第二套样式系统 |
-| 数据 | 静态 JSON 产物 | 全部语料与词谱体积经实测可在客户端承载，无需服务端 |
+| 样式 | Tailwind CSS | 只管布局（flex/gap/grid/断点）；颜色与排版一律走 antd token，不并存第二套样式系统 || 数据 | 静态 JSON 产物 | 全部语料与词谱体积经实测可在客户端承载，无需服务端 |
 | 检索 | 客户端运行时索引 | 语料 Brotli 后 2.08MB，浏览器运行时建二元索引 449ms；无服务端、离线可用 |
 | 后端（B 阶段） | PostgreSQL + Drizzle | 社区功能（账号、作品、评论）才需要；C 阶段不引入 |
 
@@ -110,6 +109,26 @@ Next.js 的静态导出模式会禁用 Route Handler 与 Server Action。因此�
 ### 引擎能力分层
 
 引擎能力按 L1–L4 分层交付，L5 后置。分层定义、判定语义与降级策略见 `docs/design/10-prosody-engine.md`。
+
+### antd 与 React 服务端组件的边界（实测）
+
+antd v6 的组件文件自带 `"use client"` 指令，因此**从服务端组件里直接 import antd 组件是可行的**。但有一条硬约束：
+
+**antd 的复合组件（如 `Typography.Title` 这类属性访问）在服务端组件里取不到。** 服务端组件从客户端模块导入得到的是**客户端引用代理**，它只能作为 JSX 元素类型使用，不暴露子组件属性。实测表现为构建期预渲染报 `Element type is invalid ... got: undefined`。
+
+**约束：任何使用 antd 复合组件的页面或组件，必须标 `"use client"`。** 纯 antd 基础组件的服务端组件用法不受影响。
+
+### 样式抽取的代价（实测）
+
+antd 的 CSS-in-JS 在构建期被抽取并**内联进每个静态页面**：
+
+| 项 | 原始 | gzip |
+| :--- | :--- | :--- |
+| antd 内联 CSS（单页） | 88.4KB | 12.1KB |
+| Tailwind 外链 CSS | 6.1KB | 2.1KB |
+| 完整页面 HTML | 106.4KB | 17.8KB |
+
+**内联 CSS 不可跨页缓存**。对数千个预渲染的内容页而言，这意味着每页都重复传输一份 antd 样式。这是内容规模上去后需要评估的项，已记入 `backlog.md`。
 
 ### 许可
 

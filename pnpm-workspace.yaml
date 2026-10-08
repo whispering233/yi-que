@@ -1,0 +1,5 @@
+# pnpm 12 要求显式声明哪些依赖允许执行安装期脚本。
+# 这两个包都通过 optionalDependencies 提供平台预编译产物，无需执行构建脚本。
+allowBuilds:
+  sharp: false
+  unrs-resolver: false

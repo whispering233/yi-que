@@ -1,0 +1,21 @@
+@import "tailwindcss";
+
+/*
+ * 字体栈
+ *
+ * 不下载全量中文字体——子集化后仍有 1.4–1.9MB，移动端不可接受。
+ * 正文用平台原生字体栈；系统字体必然缺失的扩展区汉字由构建期生成的
+ * 40KB fallback 子集补充。
+ * 见 docs/design/20-corpus-pipeline.md、docs/ui/DESIGN.md
+ */
+@theme {
+  --font-sans: system-ui, -apple-system, "PingFang SC", "HarmonyOS Sans SC",
+    "MiSans", "Microsoft YaHei", sans-serif;
+  --font-serif: "Songti SC", "Noto Serif CJK SC", "Source Han Serif SC",
+    "STSong", "SimSun", serif;
+}
+
+/*
+ * 注意：颜色与排版一律走 antd token，Tailwind 只管布局。
+ * 设计令牌的落地见任务卡 2。
+ */
