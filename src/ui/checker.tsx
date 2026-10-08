@@ -144,14 +144,14 @@ export function Checker() {
       {tune && (
         <section className="flex flex-col gap-2">
           <h2 className="text-xs text-ink-tertiary">② 选词格</h2>
+          {/* aria-pressed 比对**派生出的** form 而不是 state：
+              否则默认选中的正体虽然高亮，无障碍接口却报 false */}
           <ul className="flex flex-wrap gap-1">
             {tune.forms.map((f, i) => (
               <li key={f.id}>
                 <button
                   type="button"
                   onClick={() => setFormId(f.id)}
-                  {/* 比对**派生出的** form 而不是 state：否则默认选中的正体
-                      虽然高亮，无障碍接口却报 false */}
                   aria-pressed={form?.id === f.id}
                   className={`min-h-11 rounded-sm border px-3 text-sm ${form?.id === f.id ? "border-accent text-accent" : "border-hairline hover:border-accent"}`}
                 >
