@@ -59,7 +59,7 @@
 
 #### 一、路径前缀会改变 URL
 
-GitHub Pages 的项目页形式是 `https://<user>.github.io/<repo>/`，**有路径前缀**。因此构建时须设 `NEXT_PUBLIC_BASE_PATH=/<repo>`，由 `next.config` 消费。
+GitHub Pages 的项目页形式是 `https://<user>.github.io/<repo>/`，**有路径前缀**。因此构建时须设 `NEXT_PUBLIC_BASE_PATH=/<repo>`，由构建配置消费。
 
 换用自定义域名后站点在根路径，该前缀须**置空**——届时 URL 会整体变化。
 
