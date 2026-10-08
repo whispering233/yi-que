@@ -8,8 +8,8 @@
 
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import type { StoredCorpus, StoredRhymeBook, StoredTune, StoredTuneIndex } from "../schema/index.ts";
-import { decodeCorpus, decodeRhymeBook, decodeTune, decodeTuneIndex } from "../corpus/decode.ts";
+import type { StoredCorpus, StoredTune, StoredTuneIndex } from "../schema/index.ts";
+import { decodeCorpus, decodeTune, decodeTuneIndex } from "../corpus/decode.ts";
 
 const CORPUS_DIR = join(process.cwd(), "public", "corpus");
 const read = <T>(file: string): T => JSON.parse(readFileSync(join(CORPUS_DIR, file), "utf8")) as T;
@@ -26,16 +26,6 @@ function loadTunes() {
 export function getTunes() {
   tuneCache ??= loadTunes();
   return tuneCache;
-}
-
-let rhymeCache: ReturnType<typeof decodeRhymeBook> | null = null;
-
-/** 词林正韵。引擎判定用 */
-export function getRhymeBook() {
-  rhymeCache ??= decodeRhymeBook(
-    read<{ books: StoredRhymeBook[] }>("rhyme.json").books[0],
-  );
-  return rhymeCache;
 }
 
 let corpusCache: ReturnType<typeof decodeCorpus> | null = null;

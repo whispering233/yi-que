@@ -105,8 +105,8 @@ GitHub Pages 的项目页形式是 `https://<user>.github.io/<repo>/`，**有路
 
 | 产物 | gzip（当前托管） | Brotli（若有） | 差距 |
 | :--- | :--- | :--- | :--- |
-| 词谱（首屏必需） | 581KB | 386KB | +51% |
-| 词库语料（搜索页） | 2.77MB | 2.08MB | +33% |
+| 首屏合计（词谱 + 索引 + 韵书 + 字体） | 346KB | 235KB | +47% |
+| 词库语料（搜索页） | 2.93MB | 2.19MB | +33% |
 
 **这不改变架构**（仍是纯静态、客户端检索），只影响加载时长。若移动端实测不可接受，可选路径见 `backlog.md`。
 
@@ -145,9 +145,11 @@ GitHub Pages 的项目页形式是 `https://<user>.github.io/<repo>/`，**有路
 ### 发布步骤
 
 1. 在 `CHANGELOG.md` 中把 `[Unreleased]` 段的条目归入新的版本段，版本头形如 `## [vX.Y.Z] - YYYY-MM-DD — <主题>`
-2. 提交并推送
-3. 打 tag 并推送：`git tag vX.Y.Z && git push origin vX.Y.Z`
-4. GitHub Actions 自动从 `CHANGELOG.md` 摘取匹配该 tag 的版本段，创建 GitHub Release
+2. 同步 `package.json` 的 `version`
+3. **确认 `pnpm build` 通过**（护栏与许可自检都在构建里，失败即不得发布）
+4. 提交并推送
+5. 打 tag 并推送：`git tag vX.Y.Z && git push origin vX.Y.Z`
+6. GitHub Actions 自动从 `CHANGELOG.md` 摘取匹配该 tag 的版本段，创建 GitHub Release
 
 ### CHANGELOG 写作规范
 

@@ -42,7 +42,7 @@
 
 ## 响应式断点
 
-断点定义是**唯一来源**，位于 `src/ui/tokens.ts` 的 `BREAKPOINTS`。具体值与含义见 `30-web-app.md`。
+断点定义是**唯一来源**（前端令牌模块的 `BREAKPOINTS` 常量）。具体值与含义见 `30-web-app.md`。
 
 **两侧消费方式不同，因为 antd 无法派生：**
 
