@@ -19,6 +19,7 @@ import { SOURCES } from "./lib/sources.ts";
 import { buildCorpus } from "./lib/corpus.ts";
 import { buildFallbackCharset, buildFontSubset } from "./lib/font.ts";
 import { buildRhymes } from "./lib/rhyme.ts";
+import { runRegression } from "./regression.ts";
 import { buildTunes, tonesOf } from "./lib/tune.ts";
 import { OVERRIDES } from "./lib/slug-overrides.ts";
 import { NON_TUNE_NAMES, buildNameIndex, normalizeTuneName } from "./lib/tune-name.ts";
@@ -112,6 +113,8 @@ function tuneCounts(): { tunes: number; forms: number; parseRate: number; passRa
  * 新 id 出现是允许的（上游新增变体），清单随构建更新。
  */
 function guardTuneIds(guards: Guards, tune: ReturnType<typeof buildTunes>): void {
+  // ⚠ 本函数**不写清单**。落盘推迟到全部护栏通过之后——否则失败的构建会把
+  // 错误基线写进去，下一次「还原后再跑」反而对不上（实测踩过）
   const path = join(REPORTS, "tune-ids.json");
   const digest = (slots: string) =>
     createHash("sha256").update(tonesOf(slots)).digest("hex").slice(0, 12);
@@ -122,8 +125,8 @@ function guardTuneIds(guards: Guards, tune: ReturnType<typeof buildTunes>): void
   }
 
   if (!existsSync(path)) {
-    writeFileSync(path, JSON.stringify(current, null, 2));
-    console.log(`  · 首次生成词格 id 清单（${Object.keys(current).length} 条），已入库`);
+    pendingIds = current;
+    console.log(`  · 首次生成词格 id 清单（${Object.keys(current).length} 条）`);
     return;
   }
 
@@ -152,8 +155,17 @@ function guardTuneIds(guards: Guards, tune: ReturnType<typeof buildTunes>): void
     console.log(`  · --accept-id-change：接受 ${missing.length} 个 id 消失、${moved.length} 个指向改变`);
   }
   const added = Object.keys(current).filter((id) => !(id in previous));
-  if (added.length > 0) console.log(`  · 词格 id 新增 ${added.length} 条，清单已更新`);
-  writeFileSync(path, JSON.stringify(current, null, 2));
+  if (added.length > 0) console.log(`  · 词格 id 新增 ${added.length} 条`);
+  pendingIds = current;
+}
+
+/** 待落盘的 id 清单。**全部护栏通过后**才写——失败的构建不得污染基线 */
+let pendingIds: Record<string, string> | null = null;
+
+/** 落盘 id 清单。只在 `guards.settle()` 之后调用 */
+function flushTuneIds(): void {
+  if (!pendingIds) return;
+  writeFileSync(join(REPORTS, "tune-ids.json"), JSON.stringify(pendingIds, null, 2));
 }
 
 /**
@@ -366,11 +378,37 @@ async function main(): Promise<void> {
     `子集 ${(subset.font.length / 1024).toFixed(1)}KB`,
   );
 
+  // 引擎与词谱数据互为验证：拿全宋词跑一遍。判据不是「全部合律」——
+  // 宋词实际创作中出律是常态——而是**某词牌若大面积无法匹配任何词格，
+  // 说明引擎或该词牌的词格数据有缺陷**。
+  const reg = runRegression();
+  console.log(
+    `  · 回归：零出律 ${reg.exact}/${reg.cis}（${((reg.exact / reg.cis) * 100).toFixed(1)}%）` +
+      `｜匹配 ${reg.withForm}｜出律率 >50% ${reg.wayOff}｜可疑词牌 ${reg.suspicious.length}`,
+  );
+  guards.check("回归：零出律词作不少于基线", reg.exact >= 8000, `实测 ${reg.exact}，基线 8000`);
+  guards.check("回归：无词牌词作不超基线", reg.noTune <= 900, `实测 ${reg.noTune}，基线 900`);
+  guards.check(
+    "回归：无同字数词格不超基线",
+    reg.noForm <= 5400,
+    `实测 ${reg.noForm}，基线 5400`,
+  );
+  guards.check("回归：严重偏离的词作极少", reg.wayOff <= 40, `实测 ${reg.wayOff}，基线 40`);
+  guards.check(
+    "回归：可疑词牌不超基线",
+    reg.suspicious.length <= 130,
+    `实测 ${reg.suspicious.length}，基线 130`,
+  );
+
   guardTuneIds(guards, tune);
   guardTuneNameCoverage(guards);
   checkGzipBudget(guards, OUT);
 
-  const results = guards.settle();
+  guards.settle();
+  // 全部护栏通过才落盘基线——失败的构建不得污染它
+  flushTuneIds();
+
+  const results = guards.results;
   for (const r of results) console.log(`  ✓ ${r.name}　${r.detail}`);
   console.log(`护栏：${results.length} 项全部通过`);
 }

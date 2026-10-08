@@ -22,7 +22,7 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import type { StoredForm, StoredTune, StoredTuneIndex } from "../../src/schema/index.ts";
-import { countPieces, parseSketch, type Mark } from "./sketch.ts";
+import { END_MARKS, countPieces, parseSketch, type Mark } from "./sketch.ts";
 import { slugConsumer } from "./slug-overrides.ts";
 
 const TONE_CHARS = "平中仄";
@@ -74,7 +74,21 @@ export interface TuneArtifacts {
  *
  * 对齐完成后 `ptr` 应恰好走完权威串——否则说明谱式串与它不一致，由调用方记入待核清单。
  */
-export function encodeSlots(tones: string, seps: readonly string[]): { slots: string; aligned: boolean } {
+/** 换片标记。用 ASCII 竖线——平仄串与句读标记都是中文，不歧义 */
+export const SHIFT_MARK = "|";
+
+/**
+ * 编码字位序列。
+ *
+ * 换片标记**另加**在片末字位上（`|`）——它不在谱式串里，而由词格自述的
+ * 各片句数推出。没有它，片边界就无法定位，韵部按片分组会整体错。
+ */
+export function encodeSlots(
+  tones: string,
+  seps: readonly string[],
+  /** 各片的句数（来自自述）；给出则在片末打上 `|` */
+  pieceSentenceCounts?: readonly number[],
+): { slots: string; aligned: boolean } {
   const slots: string[] = [...tones];
   let ptr = 0;
 
@@ -106,6 +120,21 @@ export function encodeSlots(tones: string, seps: readonly string[]): { slots: st
         i += 1;
       } else {
         i += 1; // 和声文本等非结构内容
+      }
+    }
+  }
+
+  if (pieceSentenceCounts && pieceSentenceCounts.length > 1) {
+    // 按句末标记逐句计数，走到某片的末句就在该位打上换片标记
+    let sentence = 0;
+    let piece = 0;
+    for (let i = 0; i < slots.length && piece < pieceSentenceCounts.length - 1; i++) {
+      if (!END_MARKS.some((m: string) => slots[i].includes(m) || (m === "换韵" && slots[i].includes("换")))) continue;
+      sentence++;
+      if (sentence === pieceSentenceCounts[piece]) {
+        slots[i] += SHIFT_MARK;
+        piece++;
+        sentence = 0;
       }
     }
   }
@@ -180,7 +209,12 @@ export function buildTunes(upstreamDir: string): TuneArtifacts {
     const rawBySlots = new Map<string, RawForm>();
     raw.forEach((form, i) => {
       forms++;
-      const { slots, aligned } = encodeSlots(form.ge_lyu_str, form.ge_lyu_sep);
+      const sketch = origin.sketches[i] ? parseSketch(origin.sketches[i]) : null;
+      const { slots, aligned } = encodeSlots(
+        form.ge_lyu_str,
+        form.ge_lyu_sep,
+        sketch?.pieces.map((p) => p.ju),
+      );
       if (!aligned) {
         anomalies.push({
           kind: "谱式串与平仄串不一致",

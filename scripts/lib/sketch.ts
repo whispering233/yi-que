@@ -150,7 +150,7 @@ export function parseSketch(text: string): Sketch | null {
 }
 
 /** 落在句末的标记——「读」是半句，不计入句数 */
-const END_MARKS = ["句", "韵", "叶", "叠", "换韵", "重"] as const;
+export const END_MARKS = ["句", "韵", "叶", "叠", "换韵", "重"] as const;
 
 /** 落在句末**且**构成韵脚的标记。注意「句」不是韵脚 */
 const YUN_MARKS = ["韵", "叶", "叠", "换韵", "重"] as const;
