@@ -8,17 +8,21 @@
  * 上游数据与构建产物均不入版本控制，只有本目录的管道代码入库。
  */
 
-import { mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { StoredProvenance } from "../src/schema/index.ts";
 import { ensureUpstream } from "./lib/fetch.ts";
 import { Guards, GuardFailure, checkGzipBudget } from "./lib/guard.ts";
 import { countPieces, parseSketch, tokenizeMarks } from "./lib/sketch.ts";
 import { SOURCES } from "./lib/sources.ts";
+import { buildTunes, tonesOf } from "./lib/tune.ts";
 
 const ROOT = process.cwd();
 const UPSTREAM = join(ROOT, "data", "upstream");
 const OUT = join(ROOT, "public", "corpus");
+/** 待核清单与 id 清单**入库**——它们是构建期护栏的基线，不是产物 */
+const REPORTS = join(ROOT, "data", "reports");
 
 /**
  * 产物：来源与版本清单。
@@ -94,6 +98,52 @@ function tuneCounts(): { tunes: number; forms: number; parseRate: number; passRa
   return { tunes: files.length, forms, parseRate: parsed / forms, passRate: pass / parsed };
 }
 
+/**
+ * 词格 id 清单比对。
+ *
+ * id 是外链与数据库引用的锚点。**id 消失或指向改变即构建失败**——
+ * 那意味着已收录的页面失效、存量作品的引用断裂，不能静默通过。
+ *
+ * 新 id 出现是允许的（上游新增变体），清单随构建更新。
+ */
+function guardTuneIds(guards: Guards, tune: ReturnType<typeof buildTunes>): void {
+  const path = join(REPORTS, "tune-ids.json");
+  const digest = (slots: string) =>
+    createHash("sha256").update(tonesOf(slots)).digest("hex").slice(0, 12);
+
+  const current: Record<string, string> = {};
+  for (const t of tune.tunes) {
+    for (const f of t.forms) current[f.id] = digest(f.slots);
+  }
+
+  if (!existsSync(path)) {
+    writeFileSync(path, JSON.stringify(current, null, 2));
+    console.log(`  · 首次生成词格 id 清单（${Object.keys(current).length} 条），已入库`);
+    return;
+  }
+
+  const previous = JSON.parse(readFileSync(path, "utf8")) as Record<string, string>;
+  const missing = Object.keys(previous).filter((id) => !(id in current));
+  const moved = Object.keys(previous).filter(
+    (id) => id in current && current[id] !== previous[id],
+  );
+
+  guards.check(
+    "词格 id：无消失",
+    missing.length === 0,
+    missing.length ? `${missing.length} 个 id 消失（如 ${missing.slice(0, 3).join("、")}）` : "全部保留",
+  );
+  guards.check(
+    "词格 id：无指向改变",
+    moved.length === 0,
+    moved.length ? `${moved.length} 个 id 指向了不同词格（如 ${moved.slice(0, 3).join("、")}）` : "全部一致",
+  );
+
+  const added = Object.keys(current).filter((id) => !(id in previous));
+  if (added.length > 0) console.log(`  · 词格 id 新增 ${added.length} 条，清单已更新`);
+  writeFileSync(path, JSON.stringify(current, null, 2));
+}
+
 async function main(): Promise<void> {
   const guards = new Guards();
 
@@ -105,11 +155,18 @@ async function main(): Promise<void> {
   );
 
   // ② 转换
-  //    卡 5 词谱 · 卡 6 词牌名归一化 · 卡 7 语料 · 卡 8 韵书 · 卡 9 字体子集 · 卡 10 slug
+  //    卡 6 词牌名归一化 · 卡 7 语料 · 卡 8 韵书 · 卡 9 字体子集 · 卡 10 slug
+  const tune = buildTunes(UPSTREAM);
 
   // ③ 写产物
   mkdirSync(OUT, { recursive: true });
+  mkdirSync(REPORTS, { recursive: true });
   writeFileSync(join(OUT, "meta.json"), JSON.stringify(provenance()));
+  writeFileSync(join(OUT, "tunes-index.json"), JSON.stringify(tune.index));
+  writeFileSync(join(OUT, "tunes.json"), JSON.stringify({ tunes: tune.tunes }));
+
+  // 待核清单：不静默丢弃，也不阻断构建，写进清单供人工过目
+  writeFileSync(join(REPORTS, "tune-anomalies.json"), JSON.stringify(tune.anomalies, null, 2));
 
   // ④ 护栏
   const counts = corpusCounts();
@@ -119,7 +176,6 @@ async function main(): Promise<void> {
   const tunes = tuneCounts();
   guards.between("词谱：词牌数", tunes.tunes, 815, 820, " 调");
   guards.between("词谱：词格数", tunes.forms, 2280, 2310, " 体");
-  // 基线：可解析率 99.9%、通过率 96.7%。下跌说明自述格式变了或解析器退化
   guards.check(
     "词谱：自述可解析率",
     tunes.parseRate >= 0.99,
@@ -131,6 +187,7 @@ async function main(): Promise<void> {
     `实测 ${(tunes.passRate * 100).toFixed(1)}%，基线 96%`,
   );
 
+  guardTuneIds(guards, tune);
   checkGzipBudget(guards, OUT);
 
   const results = guards.settle();
