@@ -47,12 +47,22 @@ test("格律标注五态：globals.css 与 tokens.ts 一致", () => {
   }
 });
 
-test("界面骨架色是 antd 变量的别名，不是写死的值", () => {
-  // 别名层不定义值——这正是「不并存第二套样式系统」的判据
-  const alias = css.match(/@theme inline\s*\{([\s\S]*?)\n\}/);
-  assert.ok(alias, "globals.css 里找不到 @theme inline 别名层");
-  for (const m of alias[1].matchAll(/--color-([a-z-]+):\s*([^;]+);/g)) {
-    assert.match(m[2].trim(), /^var\(--ant-/, `别名 ${m[1]} 用了写死的值，应引用 antd 变量`);
+test("界面骨架色：globals.css 与 tokens.ts 一致", () => {
+  const block = themeBlock();
+  const pairs: readonly [string, string][] = [
+    ["--color-ink", PALETTE.ink],
+    ["--color-ink-secondary", PALETTE.inkSecondary],
+    ["--color-ink-tertiary", PALETTE.inkTertiary],
+    ["--color-ink-quaternary", PALETTE.inkQuaternary],
+    ["--color-canvas", PALETTE.canvas],
+    ["--color-surface", PALETTE.surface],
+    ["--color-hairline", PALETTE.hairline],
+    ["--color-accent", PALETTE.accent],
+  ];
+  for (const [name, value] of pairs) {
+    const m = block.match(new RegExp(`${name}:\\s*([^;]+);`));
+    assert.ok(m, `globals.css 里找不到 ${name}`);
+    assert.equal(m[1].trim().toLowerCase(), value.toLowerCase(), `${name} 与 tokens.ts 不一致`);
   }
 });
 

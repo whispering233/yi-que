@@ -42,14 +42,14 @@ const SHIFT_MARK = "|";
 export function decodeSlots(encoded: string): Slot[] {
   const slots: Slot[] = [];
   let tone: ToneRequirement | null = null;
-  let rhythm: RhythmMark | null = null;
+  let rhythm: RhythmMark | undefined;
   let shift = false;
 
   const flush = () => {
     if (tone === null) return;
-    slots.push({ tone, rhythm: rhythm ?? "句", ...(shift ? { shift: true } : {}) });
+    slots.push({ tone, ...(rhythm ? { rhythm } : {}), ...(shift ? { shift: true } : {}) });
     tone = null;
-    rhythm = null;
+    rhythm = undefined;
     shift = false;
   };
 

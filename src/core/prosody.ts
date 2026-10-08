@@ -67,6 +67,9 @@ function judgeTone(
 /** 韵类标记——这些位置上的字必须同韵部 */
 const RHYME_MARKS = new Set(["韵", "叶", "叠", "换"]);
 
+/** 该字位是否落在句末。没有标记的字位在句中没有句末属性 */
+const isMark = (slot: DecodedSlot, mark: string): boolean => slot.rhythm === mark;
+
 /**
  * L2：**韵脚约束**。
  *
@@ -88,7 +91,7 @@ function narrowByRhyme(
 
   // 韵段而非片——菩萨蛮这类换韵格一片内有多个韵段
   for (const segment of splitRhymeSegments(slots)) {
-    const rhymeSlots = segment.filter((i) => RHYME_MARKS.has(slots[i].rhythm));
+    const rhymeSlots = segment.filter((i) => slots[i].rhythm !== undefined && RHYME_MARKS.has(slots[i].rhythm));
     // 单韵脚无从约束：交集只有一个集合，等于没约束
     if (rhymeSlots.length < 2) continue;
 
@@ -201,7 +204,7 @@ function summarizeRhymes(
     // 该片的韵部：取首个有韵部的韵脚。判不出就留空——**不猜**
     const group = rhymes.find((r) => r.group)?.group ?? "";
     // 换韵由词格的「换」标记决定，不由前后片韵部是否相同推断
-    const changed = indices.some((i) => slots[i].rhythm === "换");
+    const changed = indices.some((i) => isMark(slots[i], "换"));
     return { pieceIndex, group, rhymes, changed };
   });
 }

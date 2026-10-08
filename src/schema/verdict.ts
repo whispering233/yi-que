@@ -35,8 +35,8 @@ interface SlotResultBase {
   readonly index: number;
   /** 该字位的平仄要求。**无论是否已填都携带**——填词的核心价值就是告诉用户这一位该平还是该仄 */
   readonly tone: ToneRequirement;
-  /** 该字位的句读标记，同样无论是否已填都携带 */
-  readonly rhythm: RhythmMark;
+  /** 该字位的句读标记，同样无论是否已填都携带。可选——句中的字位没有标记 */
+  readonly rhythm?: RhythmMark;
   readonly shift?: boolean;
 }
 

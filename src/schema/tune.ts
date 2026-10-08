@@ -20,8 +20,13 @@ export type RhythmMark = "句" | "读" | "韵" | "叶" | "叠" | "换" | "重";
 export interface Slot {
   /** 该字位的平仄要求 */
   readonly tone: ToneRequirement;
-  /** 该字位的句读标记，决定断句与韵脚位置 */
-  readonly rhythm: RhythmMark;
+  /**
+   * 该字位的句读标记，决定断句与韵脚位置。
+   *
+   * **可选**——句中的字位没有标记。曾经给它一个「句」的默认值，
+   * 结果每个字位都被当成句末，界面把整首词断成了每字一行。
+   */
+  readonly rhythm?: RhythmMark;
   /** 换片标记，标在该片最后一个字位上 */
   readonly shift?: boolean;
   /**

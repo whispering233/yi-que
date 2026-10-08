@@ -52,8 +52,8 @@ export function splitSentences(slots: readonly Slot[]): { slots: Slot[]; mark: s
   let current: Slot[] = [];
   for (const slot of slots) {
     current.push(slot);
-    // 「韵」「重」是句末的韵位，不断句；「句」「读」「叶」「叠」「换」断
-    if (slot.rhythm !== "韵" && slot.rhythm !== "重") {
+    // 有句读标记即句末——「读」是半句（顿）也要断，否则一句会挤成一块
+    if (slot.rhythm) {
       sentences.push({ slots: current, mark: slot.rhythm });
       current = [];
     }
