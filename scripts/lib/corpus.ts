@@ -9,6 +9,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { StoredAuthor, StoredCi, StoredCorpus } from "../../src/schema/index.ts";
 import { loadPinyinTable, slugifyName } from "./slug.ts";
+import { slugConsumer } from "./slug-overrides.ts";
 import { buildNameIndex, normalizeTuneName } from "./tune-name.ts";
 import type { Anomaly } from "./tune.ts";
 
@@ -125,18 +126,12 @@ export function buildCorpus(upstreamDir: string): CorpusArtifacts {
 
   const anomalies: Anomaly[] = [];
 
-  // slug 去重。**这是位置性的确定化，不是语义消歧**——卡 10 会用人工指定表替换它。
-  // 之所以现在必须做：语料里 48 组作者 slug 冲突，其中 36 组是不同的人撞车。
-  const used = new Map<string, number>();
-  const uniqueSlug = (base: string): string => {
-    const n = (used.get(base) ?? 0) + 1;
-    used.set(base, n);
-    return n === 1 ? base : `${base}-${n}`;
-  };
-
+  // slug 冲突由**人工指定表**解决。表里没有的冲突不在这里兜底——
+  // 它由 build-corpus 的护栏捕获并使构建失败（不得静默回退）。
+  const authorSlug = slugConsumer("author");
   const authors: StoredAuthor[] = authorRecords.RECORDS.map((a) => {
     const name = a.name ?? "";
-    const slug = uniqueSlug(slugifyName(name, table));
+    const slug = authorSlug(name, slugifyName(name, table));
     // 上游缺陷：80 位作者的名字被截断成单字（李、蔡、陈…），描述是 "--"
     if ([...name].length === 1) {
       anomalies.push({
@@ -182,7 +177,7 @@ export function buildCorpus(upstreamDir: string): CorpusArtifacts {
     return {
       id: Number(r.value) || i + 1,
       tuneSlug: tuneSlug ?? "",
-      authorSlug: slugifyName(r.author ?? "", table),
+      authorSlug: authorSlug(r.author ?? "", slugifyName(r.author ?? "", table)),
       // 题名留空——**语料没有题名**（全宋词体例中词牌即题）
       text,
     } satisfies StoredCi;

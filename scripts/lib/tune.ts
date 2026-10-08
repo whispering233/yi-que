@@ -23,6 +23,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import type { StoredForm, StoredTune, StoredTuneIndex } from "../../src/schema/index.ts";
 import { countPieces, parseSketch, type Mark } from "./sketch.ts";
+import { slugConsumer } from "./slug-overrides.ts";
 
 const TONE_CHARS = "平中仄";
 const MARK_CHARS = "句读韵叶叠重";
@@ -151,6 +152,7 @@ export function buildTunes(upstreamDir: string): TuneArtifacts {
     full: string;
   }[];
 
+  const tuneSlug = slugConsumer("tune");
   const indexEntries: StoredTuneIndex["tunes"][number][] = [];
   const tunes: StoredTune[] = [];
   const ids: string[] = [];
@@ -165,8 +167,9 @@ export function buildTunes(upstreamDir: string): TuneArtifacts {
     const n = Number(file.match(/\d+/)![0]);
     const raw = JSON.parse(read(join("ci_list", file))) as RawForm[];
     const entry = indexRaw[n];
-    const slug = entry?.full ?? `tune-${n}`;
     const name = entry?.names?.[0] ?? `tune-${n}`;
+    // 词牌 slug 走人工指定表——同音不同调（归字谣 / 归自谣）必须区分
+    const slug = tuneSlug(name, entry?.full ?? `tune-${n}`);
     const aliases = (entry?.names ?? []).slice(1);
 
     const origin = readOrigin(read(join("ci_origin", `cipai_${n}.txt`)));

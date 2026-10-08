@@ -20,6 +20,7 @@ import { buildCorpus } from "./lib/corpus.ts";
 import { buildFallbackCharset, buildFontSubset } from "./lib/font.ts";
 import { buildRhymes } from "./lib/rhyme.ts";
 import { buildTunes, tonesOf } from "./lib/tune.ts";
+import { OVERRIDES } from "./lib/slug-overrides.ts";
 import { NON_TUNE_NAMES, buildNameIndex, normalizeTuneName } from "./lib/tune-name.ts";
 
 const ROOT = process.cwd();
@@ -126,6 +127,10 @@ function guardTuneIds(guards: Guards, tune: ReturnType<typeof buildTunes>): void
     return;
   }
 
+  // 词格 id 由词牌 slug 派生，所以**有意改 slug 必然改 id**。
+  // 那种情况走 --accept-id-change 显式接受，而不是让护栏形同虚设。
+  const accept = process.argv.includes("--accept-id-change");
+
   const previous = JSON.parse(readFileSync(path, "utf8")) as Record<string, string>;
   const missing = Object.keys(previous).filter((id) => !(id in current));
   const moved = Object.keys(previous).filter(
@@ -134,15 +139,18 @@ function guardTuneIds(guards: Guards, tune: ReturnType<typeof buildTunes>): void
 
   guards.check(
     "词格 id：无消失",
-    missing.length === 0,
+    accept || missing.length === 0,
     missing.length ? `${missing.length} 个 id 消失（如 ${missing.slice(0, 3).join("、")}）` : "全部保留",
   );
   guards.check(
     "词格 id：无指向改变",
-    moved.length === 0,
+    accept || moved.length === 0,
     moved.length ? `${moved.length} 个 id 指向了不同词格（如 ${moved.slice(0, 3).join("、")}）` : "全部一致",
   );
 
+  if (accept && (missing.length || moved.length)) {
+    console.log(`  · --accept-id-change：接受 ${missing.length} 个 id 消失、${moved.length} 个指向改变`);
+  }
   const added = Object.keys(current).filter((id) => !(id in previous));
   if (added.length > 0) console.log(`  · 词格 id 新增 ${added.length} 条，清单已更新`);
   writeFileSync(path, JSON.stringify(current, null, 2));
@@ -201,6 +209,20 @@ function guardSlugUniqueness(guards: Guards, slugs: readonly string[], label: st
     dup.length ? `${dup.length} 组冲突（如 ${dup.slice(0, 3).map(([s, n]) => `${s}×${n}`).join("、")}）` : `${slugs.length} 个 slug 唯一`,
   );
   guards.check(`${label} slug 无空值`, empty.length === 0, `${empty.length} 个空 slug`);
+}
+
+/** 人工指定表本身也要能审计：它只该登记真实存在的名字 */
+function guardOverrideTable(guards: Guards, names: readonly string[], kind: "tune" | "author"): void {
+  const table = OVERRIDES[kind];
+  const known = new Set(names);
+  const stale = Object.keys(table).filter((n) => !known.has(n));
+  guards.check(
+    `人工指定表（${kind}）：无失效条目`,
+    stale.length === 0,
+    stale.length
+      ? `${stale.length} 条指向不存在的名字（如 ${stale.slice(0, 3).join("、")}）`
+      : `${Object.keys(table).length} 条全部有效`,
+  );
 }
 
 async function main(): Promise<void> {
@@ -318,6 +340,9 @@ async function main(): Promise<void> {
   );
   guards.between("语料：缺字标记数", corpus.stats.missing, 2900, 3200, " 处");
   guardSlugUniqueness(guards, corpus.corpus.authors.map((a) => a.slug), "词人");
+  guardSlugUniqueness(guards, tune.tunes.map((t) => t.slug), "词牌");
+  guardOverrideTable(guards, corpus.corpus.authors.map((a) => a.name), "author");
+  guardOverrideTable(guards, tune.tunes.map((t) => t.name), "tune");
 
   guards.between("韵书：词林正韵韵部数", rhyme.stats.cilinGroups, 19, 19, " 部");
   guards.between("韵书：词林正韵收字数", rhyme.stats.cilinChars, 5000, 5600, " 字");
