@@ -130,6 +130,31 @@ export const SOURCES: readonly UpstreamSource[] = [
     ],
   },
   {
+    // 韵书源。
+    //
+    // ⚠ 这个仓库**只有韵书部分可用**：其韵书数据源自维基文库《詞林正韻》（公有领域），
+    //   而它另外收录的词谱数据抓自商业网站，**不得采用**。同一仓库，来源不同，
+    //   必须分开判断。
+    //
+    // 选它而非直接解析维基文库：实测维基文库从当前网络完全不可达（60s 超时 ×
+    // 三种取法），且它没有可用的镜像机制；GitHub 托管有镜像回退与哈希校验。
+    kind: "files",
+    id: "chinese-word-rhyme",
+    purpose: "《词林正韵》韵部表（源自维基文库公有领域原典）",
+    license: "MIT",
+    homepage: "https://github.com/charlesix59/chinese_word_rhyme",
+    repo: "charlesix59/chinese_word_rhyme",
+    commit: "ff0e9c13fb037c43e0eaa5dc929c0fe4fa2ffb18",
+    files: [
+      {
+        path: "data/Cilin_Rhyme.json",
+        as: "Cilin_Rhyme.json",
+        bytes: 96054,
+        sha256: "615736bb33a3c8657bf7d6a7d27f9698eaa4e82fbc76d19c425cb0d9e416032f",
+      },
+    ],
+  },
+  {
     // 词谱源。选用理由见 docs/research/competitive-analysis.md：
     //   - MIT 许可明确，且数据来源是《钦定词谱》原典誊录（不是抓商业网站）
     //   - ci_origin 与另一份独立誊录（LyricPatterns）逐字吻合，誊录忠实性有旁证

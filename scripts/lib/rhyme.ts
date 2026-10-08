@@ -13,8 +13,10 @@
  */
 
 import { readFileSync } from "node:fs";
-import type { Reading, RhymeGroup, Tone } from "../../src/schema/index.ts";
-import { plainOf, toneOf, type PinyinTable } from "./slug.ts";
+import { readFileSync as readFile } from "node:fs";
+import { join } from "node:path";
+import type { Reading, RhymeGroup, StoredRhymeBook, Tone } from "../../src/schema/index.ts";
+import { loadPinyinTable as loadPinyinTableImpl, plainOf, toneOf, type PinyinTable } from "./slug.ts";
 
 /**
  * 中华新韵十四韵：普通话韵母 → 韵部。
@@ -198,4 +200,102 @@ export function readCilin(path: string): {
   }
 
   return { groups, readings, duplicates };
+}
+
+
+/**
+ * 领域形态 → 存储形态。
+ *
+ * **底层只存一个方向**：`韵部 → 字`（韵书的原生形态，也是产物紧凑的前提）。
+ * `字 → 字音` 的反查索引在加载时构建——两个方向都写进产物是同一份数据存两遍，
+ * 没有信息增量。
+ */
+export function toStoredBook(
+  name: string,
+  readings: ReadonlyMap<string, Reading[]>,
+  order: readonly string[],
+): { book: StoredRhymeBook; charCount: number } {
+  const byGroup = new Map<string, { chars: string[]; labels: string[]; tone: Tone }>();
+
+  for (const [char, list] of readings) {
+    for (const r of list) {
+      let g = byGroup.get(r.group);
+      if (!g) {
+        g = { chars: [], labels: [], tone: r.tone };
+        byGroup.set(r.group, g);
+      }
+      g.chars.push(char);
+      g.labels.push(r.label ?? "");
+    }
+  }
+
+  const groups = [...byGroup.keys()]
+    .sort((a, b) => order.indexOf(a) - order.indexOf(b))
+    .map((groupName) => {
+      const g = byGroup.get(groupName)!;
+      const hasLabels = g.labels.some((l) => l !== "");
+      return {
+        name: groupName,
+        tone: g.tone,
+        chars: g.chars.join("") as StoredRhymeBook["groups"][number]["chars"],
+        ...(hasLabels ? { labels: g.labels } : {}),
+      };
+    });
+
+  return {
+    book: { name, groups },
+    charCount: readings.size,
+  };
+}
+
+export interface RhymeArtifacts {
+  readonly books: readonly StoredRhymeBook[];
+  readonly stats: {
+    readonly cilinGroups: number;
+    readonly cilinChars: number;
+    readonly cilinDuplicates: number;
+    readonly xinyunGroups: number;
+    readonly xinyunChars: number;
+    readonly coveredRatio: number;
+    readonly gapChars: readonly string[];
+  };
+}
+
+/** 词林正韵的韵部次序——原典固定，不由发现顺序决定 */
+const CILIN_ORDER = [
+  "第一部", "第二部", "第三部", "第四部", "第五部", "第六部", "第七部",
+  "第八部", "第九部", "第十部", "第十一部", "第十二部", "第十三部",
+  "第十四部", "第十五部", "第十六部", "第十七部", "第十八部", "第十九部",
+];
+
+export function buildRhymes(
+  upstreamDir: string,
+  neededChars: readonly string[],
+): RhymeArtifacts {
+  const table = loadPinyinTableFrom(join(upstreamDir, "pinyin-data", "pinyin.txt"));
+  const cilin = readCilin(join(upstreamDir, "chinese-word-rhyme", "Cilin_Rhyme.json"));
+  const xinyun = deriveXinyun(table);
+
+  const gapChars = neededChars.filter((c) => !xinyun.readings.has(c));
+
+  return {
+    books: [
+      toStoredBook("词林正韵", cilin.readings, CILIN_ORDER).book,
+      toStoredBook("中华新韵", xinyun.readings, XINYUN_ORDER).book,
+    ],
+    stats: {
+      cilinGroups: new Set(cilin.groups.map((g) => g.name)).size,
+      cilinChars: cilin.readings.size,
+      cilinDuplicates: cilin.duplicates.length,
+      xinyunGroups: xinyun.groups.length,
+      xinyunChars: xinyun.readings.size,
+      coveredRatio: neededChars.length ? 1 - gapChars.length / neededChars.length : 1,
+      gapChars,
+    },
+  };
+}
+
+/** 从路径读拼音表。单独包一层免得 rhyme.ts 依赖 slug.ts 的路径参数顺序 */
+function loadPinyinTableFrom(path: string): PinyinTable {
+  return loadPinyinTableImpl(path);
 }

@@ -17,6 +17,7 @@ import { Guards, GuardFailure, checkGzipBudget } from "./lib/guard.ts";
 import { countPieces, parseSketch, tokenizeMarks } from "./lib/sketch.ts";
 import { SOURCES } from "./lib/sources.ts";
 import { buildCorpus } from "./lib/corpus.ts";
+import { buildRhymes } from "./lib/rhyme.ts";
 import { buildTunes, tonesOf } from "./lib/tune.ts";
 import { NON_TUNE_NAMES, buildNameIndex, normalizeTuneName } from "./lib/tune-name.ts";
 
@@ -216,6 +217,16 @@ async function main(): Promise<void> {
   const tune = buildTunes(UPSTREAM);
   const corpus = buildCorpus(UPSTREAM);
 
+  // 韵书需要「实际要用到哪些字」——从语料与词谱算出
+  const needed = new Set<string>();
+  for (const ci of corpus.corpus.cis) for (const ch of ci.text) needed.add(ch);
+  for (const t of tune.tunes) for (const f of t.forms) for (const ch of f.slots) needed.add(ch);
+  const isHan = (c: string) => {
+    const n = c.codePointAt(0)!;
+    return (n >= 0x3400 && n <= 0x9fff) || (n >= 0x20000 && n <= 0x3134f);
+  };
+  const rhyme = buildRhymes(UPSTREAM, [...needed].filter(isHan));
+
   // ③ 写产物
   mkdirSync(OUT, { recursive: true });
   mkdirSync(REPORTS, { recursive: true });
@@ -223,6 +234,7 @@ async function main(): Promise<void> {
   writeFileSync(join(OUT, "tunes-index.json"), JSON.stringify(tune.index));
   writeFileSync(join(OUT, "tunes.json"), JSON.stringify({ tunes: tune.tunes }));
   writeFileSync(join(OUT, "corpus.json"), JSON.stringify(corpus.corpus));
+  writeFileSync(join(OUT, "rhyme.json"), JSON.stringify({ books: rhyme.books }));
 
   // 待核清单：不静默丢弃，也不阻断构建，写进清单供人工过目
   writeFileSync(
@@ -258,6 +270,20 @@ async function main(): Promise<void> {
   );
   guards.between("语料：缺字标记数", corpus.stats.missing, 2900, 3200, " 处");
   guardSlugUniqueness(guards, corpus.corpus.authors.map((a) => a.slug), "词人");
+
+  guards.between("韵书：词林正韵韵部数", rhyme.stats.cilinGroups, 19, 19, " 部");
+  guards.between("韵书：词林正韵收字数", rhyme.stats.cilinChars, 5000, 5600, " 字");
+  guards.check(
+    "韵书：词林正韵已完成去重",
+    rhyme.stats.cilinDuplicates >= 0,
+    `剔除重复项 ${rhyme.stats.cilinDuplicates} 处`,
+  );
+  guards.between("韵书：中华新韵韵部数", rhyme.stats.xinyunGroups, 14, 14, " 部");
+  guards.check(
+    "韵书：拼音覆盖率",
+    rhyme.stats.coveredRatio >= 0.9995,
+    `实测 ${(rhyme.stats.coveredRatio * 100).toFixed(3)}%，缺口 ${rhyme.stats.gapChars.length} 字（${rhyme.stats.gapChars.slice(0, 5).join("")}）`,
+  );
 
   guardTuneIds(guards, tune);
   guardTuneNameCoverage(guards);

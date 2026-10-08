@@ -77,7 +77,9 @@ export const GZIP_BUDGET_BYTES: Readonly<Record<string, number>> = {
   "tunes-index.json": 100 * 1024,
   "tunes.json": 700 * 1024,
   "corpus.json": 3.2 * 1024 * 1024,
-  "rhyme.json": 96 * 1024,
+  // 韵书须覆盖用户可能输入的任意字，所以收全表（44435 字）而非只收语料用字。
+  // 中华新韵的拼音标签是体积主项——它是「待定」态展示可选读音的唯一依据。
+  "rhyme.json": 256 * 1024,
   "font-fallback.woff2": 50 * 1024,
 };
 
