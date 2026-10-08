@@ -82,6 +82,8 @@ app     ──→ corpus / core / ui
 
 - **不得并存第二套组件系统或样式系统。** antd 是唯一组件基座
 - **Tailwind 只管布局**（flex / gap / grid / 断点 / 尺寸）。颜色与排版一律走 antd token
+- **Tailwind 工具类只能写在原生元素上。** antd 组件自身设置过的属性无法被 Tailwind 覆盖（工具类在 `@layer` 里，antd 样式未分层，后者优先）。需要布局时用原生 wrapper 包一层
+- **禁用 antd 的响应式 API**（`Row`/`Col` 的断点 props、`Grid.useBreakpoint`）。它的断点硬编码为 576/768/992/1200，与我们的断点不一致且无法覆盖
 - **禁止在组件中写具体色值与字号**，须先在 `docs/ui/DESIGN.md` 定义令牌
 - **禁止重新定义断点数值**
 - **不得下载全量中文字体**。正文用平台原生字体栈，生僻字由构建期的扩展区 fallback 子集补充

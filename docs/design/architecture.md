@@ -106,6 +106,29 @@ Next.js 的静态导出模式会禁用 Route Handler 与 Server Action。因此�
 - 页面若引用请求期能力，静态导出会直接构建失败——这是约束生效的机制，不是需要绕开的障碍
 - B 阶段引入服务端时，因取数逻辑集中在 `corpus` 而判定逻辑集中在 `core`，改造面限于新增服务端代码与数据层，**不需要重构现有页面**
 
+### 样式层叠：Tailwind 无法覆盖 antd（实测）
+
+**Tailwind v4 的工具类位于 `@layer utilities`，而 antd 的 CSS-in-JS 样式未分层。按 CSS 规范，未分层样式优先于分层样式，与特异性无关。**
+
+实测：`<Tag className="sm:hidden">` 的类名确实在 DOM 上，但计算出的 `display` 仍是 antd 的 `inline-block`。
+
+**推论**：**Tailwind 工具类只能写在原生元素上。** 写在 antd 组件上时，只要该属性被 antd 自己的样式设置过，就会静默失效。
+
+需要给 antd 组件加布局时，用原生 wrapper 包一层，或改用组件自身的 API。
+
+### 响应式断点：antd 的不可配置（实测）
+
+antd v6 的断点硬编码在主题内部（`aliasToken` 先展开用户 token、再被硬编码值覆盖），**实测无法通过 `theme.token` 覆盖**（对照组：同一处传 `colorPrimary` 生效）。
+
+且其取值与 Tailwind 不一致：
+
+| | sm | md | lg | xl | xxl |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| antd（硬编码） | 576 | 768 | **992** | **1200** | **1600** |
+| 本项目（Tailwind 标度） | 640 | 768 | 1024 | 1280 | 1536 |
+
+**约束：禁用 antd 的响应式 API**（`Row`/`Col` 的断点 props、`Grid.useBreakpoint`）——它们会用 576/768/992/1200 这套值。响应式布局一律走 Tailwind；JS 侧需要断点判断时用 `useBreakpoint`（消费同一份断点常量）。
+
 ### 引擎能力分层
 
 引擎能力按 L1–L4 分层交付，L5 后置。分层定义、判定语义与降级策略见 `docs/design/10-prosody-engine.md`。

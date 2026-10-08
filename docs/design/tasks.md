@@ -8,9 +8,8 @@
 
 | 组 | 卡 | 名称 | 依赖 |
 | :--- | :--- | :--- | :--- |
-| **A 地基** | 1 | 应用脚手架 + UI 基座 spike + 首次部署 | 无（阻塞其余全部 UI 工作） |
-| | 2 | 设计令牌与断点单一来源 | 1 |
-| | 3 | 领域类型定义 | 1 |
+| **A 地基** | 2 | 设计令牌与断点单一来源 | — |
+| | 3 | 领域类型定义 | — |
 | **B 数据管道** | 4 | 管道骨架与护栏框架 | 3 |
 | | 5 | 词谱清洗与紧凑编码 | 4 |
 | | 6 | 词牌名归一化 | 4 |
@@ -32,30 +31,19 @@
 
 ## A 地基
 
-### 卡 1 · 应用脚手架 + UI 基座 spike + 首次部署
-
-**目标**：站点能构建、能上线，且 antd 样式在静态导出下完整。**这是全项目风险最高的一步**——antd v6 用 CSS-in-JS，在 Next.js App Router 且启用静态导出时样式能否被构建期完整抽取**尚未验证**。若不通过，UI 基座须更换，此时返工成本最低。
-
-- [x] Next.js（App Router，静态导出）+ TypeScript + Tailwind + antd v6
-- [x] `AntdRegistry` 包裹 RootLayout
-- [x] 路径前缀由构建配置从 `NEXT_PUBLIC_BASE_PATH` 消费
-- [x] 一个验证页：antd 组件 + Tailwind 布局 + 三档断点表现
-- [x] 推送后 GitHub Pages 部署跑通（`deploy.yml` 生效）
-
-**验证**：构建产物中 antd 样式完整（非无样式裸 DOM）；`curl -H 'Accept-Encoding: br' -I <url>` 确认压缩算法
-**文档**：`architecture.md`、`build.md`
-
 ### 卡 2 · 设计令牌与断点单一来源
 
 **目标**：颜色与排版只有一个来源，断点只有一个定义处。
 
-- [ ] `DESIGN.md` 的令牌落进 antd token 体系（ConfigProvider 覆盖 seed 与组件 token）
-- [ ] Tailwind 只管布局：不出现具体色值与字号
-- [ ] 断点常量单一定义，Tailwind `screens` 与 antd 响应式配置均从此派生
-- [ ] 一个对照页验证：改令牌一处生效、断点两处不漂移
+- [x] `DESIGN.md` 的令牌落进 antd token 体系（ConfigProvider 覆盖 seed token）
+- [x] Tailwind 只管布局：不出现具体色值与字号
+- [x] 断点常量单一定义（`tokens.ts`）；Tailwind 的 `@theme` 为镜像，一致性由护栏测试断言
+- [x] **禁用 antd 的响应式 API**——其断点硬编码为 576/768/992/1200 且无法覆盖（实测）
+- [x] JS 侧 `useBreakpoint` 消费同一常量（自建，因 antd 的 `useBreakpoint` 取值不一致）
+- [x] 对照页：令牌单点生效、断点两行始终一致（四个视口交叉验证）
 
-**验证**：改动令牌单一来源，页面所有引用处同步变化；断言两套断点取值相等
-**文档**：`ui/DESIGN.md`、`config.md`
+**验证**：故意改 `globals.css` 的断点值，护栏测试必须失败；四个视口的 Tailwind 与 JS 判定必须同档
+**文档**：`ui/DESIGN.md`、`config.md`、`architecture.md`
 
 ### 卡 3 · 领域类型定义
 

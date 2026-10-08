@@ -1,21 +1,30 @@
 @import "tailwindcss";
 
 /*
- * 字体栈
+ * 设计令牌的 CSS 侧镜像。
  *
- * 不下载全量中文字体——子集化后仍有 1.4–1.9MB，移动端不可接受。
- * 正文用平台原生字体栈；系统字体必然缺失的扩展区汉字由构建期生成的
- * 40KB fallback 子集补充。
- * 见 docs/design/20-corpus-pipeline.md、docs/ui/DESIGN.md
+ * 单一来源是 `src/ui/tokens.ts`——Tailwind 需要 CSS 侧的声明，无法直接读 TS，
+ * 所以这里是镜像而非来源。一致性由 `src/ui/tokens.test.ts` 断言：
+ * 改了那边忘了改这里（或反之），测试会失败。
+ *
+ * 颜色**不在这里**：颜色与排版一律走 antd token（见 tokens.ts 的 antdTheme）。
+ * Tailwind 只管布局——flex / gap / grid / 断点 / 尺寸。
  */
 @theme {
-  --font-sans: system-ui, -apple-system, "PingFang SC", "HarmonyOS Sans SC",
-    "MiSans", "Microsoft YaHei", sans-serif;
-  --font-serif: "Songti SC", "Noto Serif CJK SC", "Source Han Serif SC",
-    "STSong", "SimSun", serif;
-}
+  /*
+   * 断点。用 Tailwind 的标度，不用 antd 的内部常量：antd v6 的断点硬编码且
+   * 无法通过 theme.token 覆盖，其响应式 API 在本项目禁用。
+   */
+  --breakpoint-sm: 640px;
+  --breakpoint-md: 768px;
+  --breakpoint-lg: 1024px;
+  --breakpoint-xl: 1280px;
+  --breakpoint-2xl: 1536px;
 
-/*
- * 注意：颜色与排版一律走 antd token，Tailwind 只管布局。
- * 设计令牌的落地见任务卡 2。
- */
+  /*
+   * 字体栈。不下载全量中文字体——子集化后仍有 1.4–1.9MB，移动端不可接受。
+   * 系统字体必然缺失的扩展区汉字由构建期生成的 fallback 子集补充。
+   */
+  --font-sans: system-ui, -apple-system, "PingFang SC", "HarmonyOS Sans SC", "MiSans", "Microsoft YaHei", sans-serif;
+  --font-serif: "Songti SC", "Noto Serif CJK SC", "Source Han Serif SC", "STSong", "SimSun", serif;
+}

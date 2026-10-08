@@ -159,6 +159,8 @@ URL 一旦被搜索引擎收录，改动即损失流量。因此本节的契约*
 - **Tailwind 只管布局**：flex / gap / grid / 断点 / 尺寸
 - **颜色与排版一律走 antd token**，不写具体色值
 - 语义色变量映射 antd 的 CSS 变量，不在别处重复定义颜色
+- **Tailwind 工具类只能写在原生元素上**——antd 组件自身设置过的属性无法被 Tailwind 覆盖（工具类在 `@layer` 里，antd 样式未分层）。需要布局时用原生 wrapper 包一层
+- **禁用 antd 的响应式 API**（`Row`/`Col` 的断点 props、`Grid.useBreakpoint`）——其断点硬编码且与我们的不一致。响应式一律走 Tailwind，JS 侧用 `useBreakpoint`
 - 设计令牌的文档镜像见 `../ui/DESIGN.md`
 
 ## SEO

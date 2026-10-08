@@ -13,6 +13,8 @@
     "isolatedModules": true,
     "jsx": "react-jsx",
     "incremental": true,
+    // 护栏测试用 node --test 直接跑 .ts，Node 要求显式扩展名
+    "allowImportingTsExtensions": true,
     "plugins": [
       {
         "name": "next"

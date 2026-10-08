@@ -11,6 +11,9 @@
 
 ### Added
 
+- **设计令牌单一来源**：`src/ui/tokens.ts` 定义断点、字体栈、调色板与 antd 主题；`globals.css` 的 `@theme` 是 CSS 侧镜像（Tailwind 无法读 TS），一致性由护栏测试断言。antd 主题从该文件直接消费。
+- **断点护栏测试**：断言 `globals.css` 与 `tokens.ts` 的断点、字体栈一致。用 Node 内置测试运行器（`node --test`，Node 22 原生跑 `.ts`），**不引测试框架**。
+- **`useBreakpoint`**：基于 `matchMedia` 的断点 hook，消费同一份 `BREAKPOINTS` 常量。
 - **应用脚手架**：Next.js 16（App Router，静态导出）+ TypeScript + Tailwind v4 + antd v6，并含一个基座验证页。
   - 静态导出下 antd 的 CSS-in-JS 被构建期**完整抽取**：单页 HTML 106.4KB（gzip 17.8KB），其中 antd 内联样式 88.4KB（gzip 12.1KB）、Tailwind 外链 6.1KB（gzip 2.1KB）
   - 路径前缀由构建期的 `NEXT_PUBLIC_BASE_PATH` 消费；产物为目录式（`trailingSlash`），静态托管兼容性最好
@@ -23,6 +26,8 @@
 
 ### Note
 
+- **Tailwind 工具类只能写在原生元素上。** Tailwind v4 的工具类在 `@layer utilities` 里，而 antd 的 CSS-in-JS 样式未分层——按 CSS 规范未分层样式优先，与特异性无关。实测 `<Tag className="sm:hidden">` 的类名在 DOM 上但 `display` 仍为 antd 的 `inline-block`。
+- **禁用 antd 的响应式 API**（`Row`/`Col` 的断点 props、`Grid.useBreakpoint`）。其断点硬编码为 576/768/992/1200 且**无法通过 `theme.token` 覆盖**（实测；对照组传 `colorPrimary` 生效），与本项目的 640/768/1024/1280 不一致。响应式一律走 Tailwind，JS 侧用 `useBreakpoint`。
 - **antd 的复合组件（`Typography.Title` 这类属性访问）在 React 服务端组件里取不到**——服务端组件从客户端模块导入得到的是客户端引用代理。**使用 antd 复合组件的页面必须标 `"use client"`。**
 - **antd 抽取的样式是内联进每个页面的，不可跨页缓存。** 内容页规模上去后需重新评估。
 - **本项目采用 AGPL-3.0**。网络服务形态下必须为用户提供获取对应源码的入口——页脚的「源码」链接是许可证义务，不是可选装饰。
