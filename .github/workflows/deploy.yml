@@ -44,11 +44,11 @@ jobs:
             echo "::notice::package.json 不存在，跳过构建与部署（应用脚手架尚未建立）"
           fi
 
+      # 不在此指定 pnpm 版本——从 package.json 的 packageManager 字段读取，
+      # 版本只保留一处来源。两处同时指定会让 pnpm/action-setup 直接报错退出。
       - name: Setup pnpm
         if: steps.scaffold.outputs.ready == 'true'
         uses: pnpm/action-setup@v6
-        with:
-          version: 12
 
       - name: Setup Node.js
         if: steps.scaffold.outputs.ready == 'true'

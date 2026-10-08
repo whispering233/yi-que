@@ -11,6 +11,8 @@
 
 **pnpm 12 需要显式声明安装期脚本白名单**，否则安装会报 `ERR_PNPM_IGNORED_BUILDS` 而失败。默认依赖通过平台预编译产物提供二进制，无需执行构建脚本。
 
+**pnpm 版本只保留一处来源**——写在 `package.json` 的 `packageManager` 字段，CI 从那里读。在工作流里再指定一次会让 `pnpm/action-setup` 直接报错退出。
+
 Tailwind v4 在 Next.js 16 下以 **Turbopack loader** 形式接入，**不使用 PostCSS**，因此仓库中没有 PostCSS 配置。
 
 数据管道在开发环境的首次运行会拉取上游数据源，需要网络。
