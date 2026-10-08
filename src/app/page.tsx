@@ -1,6 +1,7 @@
 "use client";
 
 import { Alert, Button, Card, Divider, Flex, Space, Tag, Typography } from "antd";
+import { AntdProvider } from "@/ui/antd-provider";
 import { BREAKPOINTS } from "@/ui/tokens";
 import { useBreakpoint } from "@/ui/use-breakpoint";
 
@@ -22,6 +23,7 @@ export default function Home() {
   const hit = useBreakpoint();
 
   return (
+    <AntdProvider>
     <main className="mx-auto flex w-full max-w-4xl flex-col gap-8 px-4 py-10 md:px-6 lg:py-16">
       <header className="flex flex-col gap-2">
         <Title level={1} className="!mb-0">
@@ -150,5 +152,6 @@ export default function Home() {
         </Text>
       </footer>
     </main>
+    </AntdProvider>
   );
 }

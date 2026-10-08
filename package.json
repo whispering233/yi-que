@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "next dev",
     "build:corpus": "node scripts/build-corpus.ts",
-    "build": "pnpm build:corpus && pnpm typecheck && next build",
+    "build": "pnpm build:corpus && pnpm typecheck && next build && node scripts/clean-export.ts",
     "start": "next start",
     "lint": "eslint",
     "test": "node --test 'src/**/*.test.ts' 'scripts/**/*.test.ts'",
